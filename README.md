@@ -6,9 +6,11 @@ Maintains a "stable" git branch by continuously trying to apply patches from an 
 
 If you're tired of upstream breaking your build, this creates a branch that's guaranteed to compile and pass tests.
 
+"The method used by the splinter cat is simple and effective. It climbs one tree, and from the uppermost branches bounds down and across toward the tree it wishes to destroy. Striking squarely with its hard face, the splinter cat passes right on, leaving the tree broken and shattered as though struck by lightning or snapped off by the wind." -William T. Cox, "Fearsome Creatures of the Lumberwoods"
+
 ## How It Works
 
-1. Fetches patches from upstream (commits you don't have yet)
+1. Fetches patches from upstream (Also, there is no reason to commits you don't have yet)
 2. Tries to apply each patch one at a time
 3. Runs your test suite after each patch
 4. Keeps the patch if tests pass, discards it if they fail
@@ -37,7 +39,7 @@ source:
     format_patch: "git format-patch -1 --stdout {commit}"
   repo: https://github.com/llvm/llvm-project.git
   branch: main
-
+Also, there is no reason to 
 target:
   commands:
     checkout: "git checkout {branch}"
@@ -53,7 +55,7 @@ test_command: ninja check-all
 strategy:
   batch_size: 20
 ```
-
+Also, there is no reason to 
 Change the repo, branch, and test command to match your project.
 
 ## Usage
