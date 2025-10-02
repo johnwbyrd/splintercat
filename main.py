@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-import subprocess
-import yaml
-import sys
 import select
+import subprocess
+import sys
 from pathlib import Path
+
+import yaml
+
 
 class Result:
     def __init__(self, returncode, stdout, stderr):
@@ -164,11 +166,11 @@ class Target:
 class Strategy:
     def __init__(self, config):
         self.batch_size = config.get('batch_size', 20)
-    
+
     def run(self, source, target):
         patches = source.get_patches()[:self.batch_size]
         print(f"Found {len(patches)} patches")
-        
+
         for patch in patches:
             state = target.current_state()
             if target.apply([patch]) and target.test():
