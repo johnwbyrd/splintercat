@@ -1,0 +1,24 @@
+source:
+  commands:
+    fetch: "git fetch {repo} {branch}"
+    merge_base: "git merge-base HEAD FETCH_HEAD"
+    list_commits: "git rev-list --reverse {merge_base}..FETCH_HEAD"
+    format_patch: "git format-patch -1 --stdout {commit}"
+  repo: https://github.com/llvm/llvm-project.git
+  branch: main
+
+target:
+  commands:
+    checkout: "git checkout {branch}"
+    get_state: "git rev-parse HEAD"
+    apply: "echo '{diff}' | git apply"
+    add: "git add -A"
+    commit: "git commit -m '{message}'"
+    rollback: "git reset --hard {state}"
+  branch: stable
+
+test_command: ninja check-all
+
+strategy:
+  batch_size: 20
+
