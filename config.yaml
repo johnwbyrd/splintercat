@@ -1,24 +1,29 @@
 source:
   commands:
-    fetch: "git fetch {repo} {branch}"
-    merge_base: "git merge-base HEAD FETCH_HEAD"
-    list_commits: "git rev-list --reverse {merge_base}..FETCH_HEAD"
-    format_patch: "git format-patch -1 --stdout {commit}"
+    fetch: "git -C {workdir} fetch {repo} {branch}"
+    merge_base: "git -C {workdir} merge-base HEAD FETCH_HEAD"
+    list_commits: "git -C {workdir} rev-list --reverse {merge_base}..FETCH_HEAD | head -n {batch_size}"
+    format_patch: "git -C {workdir} format-patch -1 --stdout {commit}"
   repo: https://github.com/llvm/llvm-project.git
   branch: main
+  workdir: /home/jbyrd/git/llvm-mos
 
 target:
   commands:
-    checkout: "git checkout {branch}"
-    get_state: "git rev-parse HEAD"
-    apply: "echo '{diff}' | git apply"
-    add: "git add -A"
-    commit: "git commit -m '{message}'"
-    rollback: "git reset --hard {state}"
+    checkout: "git -C {workdir} rev-parse --verify {branch} >/dev/null 2>&1 && git -C {workdir} checkout {branch} || git -C {workdir} checkout -b {branch} {start_point}"
+    get_state: "git -C {workdir} rev-parse HEAD"
+    apply: "git -C {workdir} apply"
+    add: "git -C {workdir} add -A"
+    commit: "git -C {workdir} commit -m '{message}'"
+    rollback: "git -C {workdir} reset --hard {state} && git -C {workdir} clean -fd"
   branch: stable
+  start_point: feature/enable-workflow-variable
+  workdir: /home/jbyrd/git/llvm-mos
 
-test_command: ninja check-all
+test_command: cd {workdir}/build && ninja
 
 strategy:
-  batch_size: 20
+  batch_size: 1
+
+interactive: false
 

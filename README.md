@@ -88,6 +88,13 @@ Three simple classes with duck-typed interfaces:
 
 All three are configured via YAML commands, not hardcoded. Want to use a different VCS? Just change the commands.
 
+### Design Lessons
+
+- **Patch ordering matters**: Apply patches chronologically from merge-base forward; `git rev-list --reverse | head -n N` not `--max-count=N`
+- **Never pass data through shell strings**: Use stdin for patches; shell escaping fails with arbitrary content
+- **Rollback must clean untracked files**: `git reset --hard` alone leaves new files; add `git clean -fd`
+- **CommandRunner pattern**: Separate command execution from data handling; support stdin, real-time output, no globals
+
 ## Future Improvements
 
 ### Level 2: Bisection Strategy
