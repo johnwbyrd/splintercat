@@ -9,4 +9,5 @@ commands:
   apply_abort: "git -C {workdir} am --abort"
   add: "git -C {workdir} add -A"
   commit: "git -C {workdir} commit -m '{message}'"
-  rollback: "git -C {workdir} reset --hard {state} && git -C {workdir} clean -fd"
+  rollback_reset: "git -C {workdir} reset --hard {state}"
+  rollback_clean: "git -C {workdir} clean -fd"

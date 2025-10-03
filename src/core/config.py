@@ -25,7 +25,8 @@ class Commands(BaseModel):
     apply_abort: str | None = None
     add: str | None = None
     commit: str | None = None
-    rollback: str | None = None
+    rollback_reset: str | None = None
+    rollback_clean: str | None = None
 
 
 class SourceConfig(BaseModel):

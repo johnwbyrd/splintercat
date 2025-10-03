@@ -66,10 +66,10 @@ class Runner:
 
             # Target tries the patches (atomic operation)
             logger.info(f"Attempting {next_set.size()} patch(es)...")
-            success = target.try_patches(next_set)
+            success, applied = target.try_patches(next_set)
 
             # Record result for strategy to analyze
-            state.record_result(next_set, success)
+            state.record_result(next_set, success, applied)
 
         # Report final results
         self._report_results(state)

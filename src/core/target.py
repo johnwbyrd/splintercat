@@ -16,14 +16,16 @@ class Target(ABC):
         """Prepare target branch (create if needed, checkout if exists)."""
 
     @abstractmethod
-    def try_patches(self, patchset: PatchSet) -> bool:
+    def try_patches(self, patchset: PatchSet) -> tuple[bool, bool]:
         """Apply patches, test, and rollback on failure (atomic operation).
 
         Args:
             patchset: PatchSet to apply
 
         Returns:
-            True if all patches applied and tests passed, False otherwise
+            (success, applied):
+                - success: True if all patches applied and tests passed
+                - applied: True if patches applied (even if tests failed)
         """
 
     @abstractmethod
@@ -63,7 +65,7 @@ class GitTarget(Target):
         )
         logger.success(f"Branch {self.config.branch} ready")
 
-    def try_patches(self, patchset: PatchSet) -> bool:
+    def try_patches(self, patchset: PatchSet) -> tuple[bool, bool]:
         """Apply patches, test, and rollback on failure (atomic operation).
 
         This is atomic from the Strategy's perspective - either everything
@@ -73,7 +75,9 @@ class GitTarget(Target):
             patchset: PatchSet to apply
 
         Returns:
-            True if all patches applied and tests passed, False otherwise
+            (success, applied):
+                - success: True if all patches applied and tests passed
+                - applied: True if patches applied (even if tests failed)
         """
         # Save current state for rollback
         state = self._get_current_state()
@@ -81,18 +85,18 @@ class GitTarget(Target):
 
         # Apply all patches
         if not self._apply_patches(patchset):
-            logger.warning("Patch application failed, rolling back")
+            logger.warning("Patches failed to apply - skipping tests, rolling back")
             self._rollback(state)
-            return False
+            return (False, False)
 
         # Run tests
         if not self._test():
             logger.warning("Tests failed, rolling back")
             self._rollback(state)
-            return False
+            return (False, True)
 
         logger.success(f"Successfully applied and tested {patchset.size()} patch(es)")
-        return True
+        return (True, True)
 
     def commit(self, message: str):
         """Commit the currently applied patches.
@@ -175,7 +179,16 @@ class GitTarget(Target):
             state: Git commit hash to roll back to
         """
         logger.info(f"Rolling back to {state[:8]}")
+
+        # Clean up any git am state first (may exist from failed apply or test)
         self.runner.run(
-            self.config.commands.rollback.format(state=state, **self.config.model_dump())
+            self.config.commands.apply_abort.format(**self.config.model_dump()), check=False
         )
+
+        # Run reset and clean separately to avoid index.lock race conditions
+        self.runner.run(
+            self.config.commands.rollback_reset.format(state=state, **self.config.model_dump())
+        )
+        self.runner.run(self.config.commands.rollback_clean.format(**self.config.model_dump()))
+
         logger.warning("Rolled back changes")

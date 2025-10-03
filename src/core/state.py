@@ -12,6 +12,7 @@ class Result(BaseModel):
 
     patch_ids: list[str]
     success: bool
+    applied: bool  # True if patches applied (even if tests failed)
     timestamp: datetime = Field(default_factory=datetime.now)
     duration_apply: float = 0.0
     duration_test: float = 0.0
@@ -40,6 +41,7 @@ class State(BaseModel):
         self,
         patchset: PatchSet,
         success: bool,
+        applied: bool,
         duration_apply: float = 0.0,
         duration_test: float = 0.0,
         apply_output: str = "",
@@ -51,6 +53,7 @@ class State(BaseModel):
         Args:
             patchset: PatchSet that was attempted
             success: Whether apply + test succeeded
+            applied: Whether patches applied (even if tests failed)
             duration_apply: Seconds spent applying patches
             duration_test: Seconds spent testing
             apply_output: Output from git am
@@ -62,6 +65,7 @@ class State(BaseModel):
         result = Result(
             patch_ids=patch_ids,
             success=success,
+            applied=applied,
             duration_apply=duration_apply,
             duration_test=duration_test,
             apply_output=apply_output,
