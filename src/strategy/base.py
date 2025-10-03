@@ -3,22 +3,23 @@
 from abc import ABC, abstractmethod
 
 from src.core.state import State
-from src.patchset import PatchSet
 
 
 class Strategy(ABC):
     """Abstract base class for patch application strategies.
 
-    Strategy is a pure function that analyzes State and decides what to try next.
+    Strategy drives the target to apply and test patches.
     """
 
     @abstractmethod
-    def next_attempt(self, state: State) -> PatchSet | None:
-        """Decide what to try next based on current state.
+    def run(self, state: State, target) -> None:
+        """Run strategy to completion.
+
+        Strategy has full control over target operations.
+        Updates state with results.
+        Sets state.done = True when finished.
 
         Args:
-            state: Complete state with original patches and all attempt history
-
-        Returns:
-            PatchSet to try next, or None (strategy should set state.done=True)
+            state: Complete state with original patches and results
+            target: Target to apply patches to
         """

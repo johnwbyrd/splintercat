@@ -64,11 +64,21 @@ class BisectStrategy(Strategy):
             )
 
         else:
-            # Failure - bisect or mark as bad
-            failed_size = len(last_result.patch_ids)
+            # Failure - check if we know which specific patch failed to apply
+            if last_result.failed_patch_id:
+                # Patch failed to apply - mark as bad immediately, no need to bisect
+                bad_patch_id = last_result.failed_patch_id
+                known_bad_ids.add(bad_patch_id)
+                strategy_data["known_bad_ids"] = list(known_bad_ids)
+                strategy_data["current_bisect"] = None
+                current_bisect = None
 
-            if failed_size == 1:
-                # Single patch failed - mark as bad and skip
+                logger.warning(
+                    f"Patch {bad_patch_id[:8]} failed to apply - marking as bad and retrying without it"
+                )
+
+            elif len(last_result.patch_ids) == 1:
+                # Single patch failed tests (not apply) - mark as bad and skip
                 bad_patch_id = last_result.patch_ids[0]
                 known_bad_ids.add(bad_patch_id)
                 strategy_data["known_bad_ids"] = list(known_bad_ids)
@@ -84,14 +94,14 @@ class BisectStrategy(Strategy):
                 current_bisect = None
 
                 logger.warning(
-                    f"Patch {bad_patch_id[:8]} failed alone - marking as bad and skipping"
+                    f"Patch {bad_patch_id[:8]} failed tests - marking as bad and skipping"
                 )
 
             else:
-                # Multiple patches failed - bisect
+                # Multiple patches, tests failed - need to bisect
                 # Find the range indices
                 start_index = applied_up_to
-                end_index = start_index + failed_size
+                end_index = start_index + len(last_result.patch_ids)
 
                 # Try first half
                 mid_index = (start_index + end_index) // 2
@@ -103,7 +113,7 @@ class BisectStrategy(Strategy):
                 current_bisect = strategy_data["current_bisect"]
 
                 logger.info(
-                    f"Bisecting failed range [{start_index}, {end_index}) " f"- trying first half"
+                    f"Tests failed for range [{start_index}, {end_index}) - bisecting to first half"
                 )
 
         # Decide what to try next

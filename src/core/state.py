@@ -13,6 +13,7 @@ class Result(BaseModel):
     patch_ids: list[str]
     success: bool
     applied: bool  # True if patches applied (even if tests failed)
+    failed_patch_id: str | None = None  # ID of patch that failed to apply
     timestamp: datetime = Field(default_factory=datetime.now)
     duration_apply: float = 0.0
     duration_test: float = 0.0
@@ -42,6 +43,7 @@ class State(BaseModel):
         patchset: PatchSet,
         success: bool,
         applied: bool,
+        failed_patch_id: str | None = None,
         duration_apply: float = 0.0,
         duration_test: float = 0.0,
         apply_output: str = "",
@@ -54,6 +56,7 @@ class State(BaseModel):
             patchset: PatchSet that was attempted
             success: Whether apply + test succeeded
             applied: Whether patches applied (even if tests failed)
+            failed_patch_id: ID of patch that failed to apply (if any)
             duration_apply: Seconds spent applying patches
             duration_test: Seconds spent testing
             apply_output: Output from git am
@@ -66,6 +69,7 @@ class State(BaseModel):
             patch_ids=patch_ids,
             success=success,
             applied=applied,
+            failed_patch_id=failed_patch_id,
             duration_apply=duration_apply,
             duration_test=duration_test,
             apply_output=apply_output,
@@ -74,3 +78,24 @@ class State(BaseModel):
         )
 
         self.results.append(result)
+
+    def get_strategy_data(self, key: str, default=None):
+        """Get strategy-specific data.
+
+        Args:
+            key: Key to retrieve
+            default: Default value if key doesn't exist
+
+        Returns:
+            Value for key, or default if not found
+        """
+        return self.strategy_data.get(key, default)
+
+    def set_strategy_data(self, key: str, value):
+        """Set strategy-specific data.
+
+        Args:
+            key: Key to set
+            value: Value to store
+        """
+        self.strategy_data[key] = value

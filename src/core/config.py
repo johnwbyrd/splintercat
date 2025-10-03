@@ -19,6 +19,7 @@ class Commands(BaseModel):
     merge_base: str
     list_commits: str
     format_patch: str
+    check_clean: str | None = None
     checkout: str | None = None
     get_state: str | None = None
     apply: str | None = None
@@ -46,6 +47,7 @@ class TargetConfig(BaseModel):
     base_ref: str
     workdir: Path
     force_recreate: bool = False
+    preserve_build_artifacts: bool = True
     commands: Commands
 
 
@@ -55,6 +57,7 @@ class Settings(BaseSettings):
     source: SourceConfig
     target: TargetConfig
     test_command: str
+    strategy: str = "greedy"
     interactive: bool = False
     verbose: bool = False
     log_truncate_length: int = 60

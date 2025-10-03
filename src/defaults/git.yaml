@@ -3,6 +3,7 @@ commands:
   merge_base: "git -C {workdir} merge-base HEAD FETCH_HEAD"
   list_commits: "git -C {workdir} rev-list --reverse {merge_base}..FETCH_HEAD{limit_flag}"
   format_patch: "git -C {workdir} format-patch -1 --stdout {commit}"
+  check_clean: "git -C {workdir} diff-index --quiet HEAD --"
   checkout: "git -C {workdir} checkout -{branch_create_flag} {branch} {base_ref}"
   get_state: "git -C {workdir} rev-parse HEAD"
   apply: "git -C {workdir} am"

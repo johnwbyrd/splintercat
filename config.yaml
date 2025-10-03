@@ -2,7 +2,7 @@ source:
   repo: https://github.com/llvm/llvm-project.git
   branch: main
   workdir: /home/jbyrd/git/llvm-mos
-  limit: 500
+  limit: 100
 
 target:
   branch: stable-test
@@ -10,6 +10,7 @@ target:
   workdir: /home/jbyrd/git/llvm-mos
   force_recreate: true
 
-test_command: echo cd {workdir}/build && ninja
+test_command: echo cd {workdir}/build && echo ninja
 
+strategy: greedy
 interactive: false

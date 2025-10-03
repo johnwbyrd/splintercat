@@ -6,7 +6,7 @@ from src.core.log import logger, setup_logging
 from src.core.source import GitSource
 from src.core.state import State
 from src.core.target import GitTarget
-from src.strategy import BisectStrategy
+from src.strategy import BisectStrategy, GreedyStrategy, SequentialStrategy
 
 
 class Runner:
@@ -40,7 +40,17 @@ class Runner:
         runner = CommandRunner(self.settings.interactive)
         source = GitSource(self.settings.source, runner, self.settings.log_truncate_length)
         target = GitTarget(self.settings.target, self.settings.test_command, runner)
-        strategy = BisectStrategy()
+
+        # Select strategy based on config
+        if self.settings.strategy == "sequential":
+            strategy = SequentialStrategy()
+        elif self.settings.strategy == "bisect":
+            strategy = BisectStrategy()
+        elif self.settings.strategy == "greedy":
+            strategy = GreedyStrategy()
+        else:
+            logger.warning(f"Unknown strategy '{self.settings.strategy}', using greedy")
+            strategy = GreedyStrategy()
 
         # Get all patches from source
         original_patches = source.get_patches()
@@ -56,20 +66,8 @@ class Runner:
         # Prepare target branch
         target.checkout()
 
-        # Main loop - run until strategy says done
-        while not state.done:
-            # Strategy decides what to try next
-            next_set = strategy.next_attempt(state)
-
-            if next_set is None:
-                break
-
-            # Target tries the patches (atomic operation)
-            logger.info(f"Attempting {next_set.size()} patch(es)...")
-            success, applied = target.try_patches(next_set)
-
-            # Record result for strategy to analyze
-            state.record_result(next_set, success, applied)
+        # Run strategy
+        strategy.run(state, target)
 
         # Report final results
         self._report_results(state)
