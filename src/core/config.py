@@ -1,8 +1,8 @@
 """Configuration loading from YAML and command-line arguments."""
 
-import yaml
 from pathlib import Path
 
+import yaml
 from pydantic import BaseModel, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
