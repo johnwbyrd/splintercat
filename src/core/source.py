@@ -6,8 +6,7 @@ from src.core.command_runner import CommandRunner
 from src.core.config import SourceConfig
 from src.core.log import logger
 from src.core.patch import Patch
-from src.patchset.base import PatchSet
-from src.patchset.range import RangePatchSet
+from src.patchset import PatchSet
 
 
 class Source(ABC):
@@ -94,4 +93,4 @@ class GitSource(Source):
                 )
 
         logger.success(f"Generated {len(patches)} patches")
-        return RangePatchSet(patches)
+        return PatchSet(patches)

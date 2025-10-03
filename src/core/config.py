@@ -51,4 +51,5 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_nested_delimiter="__",
+        cli_parse_args=True,
     )

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from src.core.command_runner import CommandRunner
 from src.core.config import TargetConfig
 from src.core.log import logger
-from src.patchset.base import PatchSet
+from src.patchset import PatchSet
 
 
 class Target(ABC):
