@@ -1,21 +1,9 @@
 source:
-  commands:
-    fetch: "git -C {workdir} fetch {repo} {branch}"
-    merge_base: "git -C {workdir} merge-base HEAD FETCH_HEAD"
-    list_commits: "git -C {workdir} rev-list --reverse {merge_base}..FETCH_HEAD | head -n {batch_size}"
-    format_patch: "git -C {workdir} format-patch -1 --stdout {commit}"
   repo: https://github.com/llvm/llvm-project.git
   branch: main
   workdir: /home/jbyrd/git/llvm-mos
 
 target:
-  commands:
-    checkout: "git -C {workdir} rev-parse --verify {branch} >/dev/null 2>&1 && git -C {workdir} checkout {branch} || git -C {workdir} checkout -b {branch} {start_point}"
-    get_state: "git -C {workdir} rev-parse HEAD"
-    apply: "git -C {workdir} am"
-    add: "git -C {workdir} add -A"
-    commit: "git -C {workdir} commit -m '{message}'"
-    rollback: "git -C {workdir} reset --hard {state} && git -C {workdir} clean -fd"
   branch: stable
   start_point: feature/enable-workflow-variable
   workdir: /home/jbyrd/git/llvm-mos
@@ -23,4 +11,3 @@ target:
 test_command: cd {workdir}/build && ninja
 
 interactive: false
-

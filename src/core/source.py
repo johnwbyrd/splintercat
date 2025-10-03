@@ -58,7 +58,7 @@ class GitSource(Source):
 
         if not merge_base:
             logger.warning("No merge-base found, no patches to fetch")
-            return []
+            return PatchSet([])
 
         logger.debug(f"Merge-base: {merge_base}")
 
@@ -72,7 +72,7 @@ class GitSource(Source):
 
         if not commit_list:
             logger.info("No new commits to process")
-            return []
+            return PatchSet([])
 
         commits = commit_list.split("\n")
         logger.info(f"Found {len(commits)} commits to process")

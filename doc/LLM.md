@@ -1,5 +1,9 @@
 # Instructions for LLMs
 
+## Development Environment
+
+- **Virtual environment** - Python tools are in `../.venv/bin/` - source `../.venv/bin/activate` before running ruff, python, pip, etc.
+
 ## Code Style
 
 - **NO EMOJIS** - Do not use emojis anywhere in code, comments, docstrings, commit messages, or markdown files

@@ -1,27 +1,23 @@
 """Bisect strategy - divide and conquer for faster application."""
 
+from src.core.state import State
+from src.patchset import PatchSet
 from src.strategy.base import Strategy
 
 
 class BisectStrategy(Strategy):
-    """Strategy that uses bisection to find working patch subsets."""
+    """Strategy that uses bisection to find working patch subsets.
 
-    def __init__(self, config: dict):
-        """Initialize BisectStrategy.
+    Not yet implemented - placeholder for Phase 2.
+    """
 
-        Args:
-            config: Strategy configuration from YAML
-        """
-        self.config = config
-
-    def apply(self, patchset, target):
-        """Try whole set, bisect on failure.
+    def next_attempt(self, state: State) -> PatchSet | None:
+        """Decide what to try next using bisection.
 
         Args:
-            patchset: PatchSet to apply
-            target: GitTarget to apply to
+            state: Complete state with original patches and all attempt history
 
         Returns:
-            Result object describing what was applied
+            PatchSet to try next, or None if done
         """
-        raise NotImplementedError
+        raise NotImplementedError("BisectStrategy not yet implemented")
