@@ -1,7 +1,6 @@
 """Configuration loading from YAML and command-line arguments."""
 
 from pathlib import Path
-from typing import Any, Tuple, Type
 
 import yaml
 from pydantic import BaseModel, model_validator
@@ -66,12 +65,12 @@ class Settings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: Type[BaseSettings],
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
-    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
         """Add YAML config source to settings sources."""
         return (
             init_settings,

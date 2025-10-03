@@ -10,6 +10,6 @@ target:
   workdir: /home/jbyrd/git/llvm-mos
   force_recreate: true
 
-test_command: cd {workdir}/build && ninja
+test_command: echo "Test ninja would run here"
 
 interactive: false

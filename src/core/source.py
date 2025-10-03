@@ -86,14 +86,13 @@ class GitSource(Source):
             result = self.runner.run(
                 self.config.commands.format_patch.format(
                     commit=commit, **self.config.model_dump()
-                )
+                ),
+                log_level="DEBUG",
             )
             if result.stdout:
                 patch = Patch(id=commit, diff=result.stdout)
                 patches.append(patch)
-                logger.debug(
-                    f"Generated patch for {commit[:8]}: {patch.subject[:60]}"
-                )
+                logger.info(f"Generated patch for {commit[:8]}: {patch.subject[:60]}")
 
         logger.success(f"Generated {len(patches)} patches")
         return PatchSet(patches)
