@@ -12,7 +12,7 @@ target:
   commands:
     checkout: "git -C {workdir} rev-parse --verify {branch} >/dev/null 2>&1 && git -C {workdir} checkout {branch} || git -C {workdir} checkout -b {branch} {start_point}"
     get_state: "git -C {workdir} rev-parse HEAD"
-    apply: "git -C {workdir} apply"
+    apply: "git -C {workdir} am"
     add: "git -C {workdir} add -A"
     commit: "git -C {workdir} commit -m '{message}'"
     rollback: "git -C {workdir} reset --hard {state} && git -C {workdir} clean -fd"
@@ -21,9 +21,6 @@ target:
   workdir: /home/jbyrd/git/llvm-mos
 
 test_command: cd {workdir}/build && ninja
-
-strategy:
-  batch_size: 1
 
 interactive: false
 

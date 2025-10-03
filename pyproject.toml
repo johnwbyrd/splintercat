@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Maintains a stable git branch by applying and testing upstream patches"
 requires-python = ">=3.11"
 dependencies = [
-    "pyyaml>=6.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "loguru>=0.7.0",
 ]
 
 [project.optional-dependencies]
