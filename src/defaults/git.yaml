@@ -6,6 +6,7 @@ commands:
   checkout: "git -C {workdir} checkout -{branch_create_flag} {branch} {base_ref}"
   get_state: "git -C {workdir} rev-parse HEAD"
   apply: "git -C {workdir} am"
+  apply_abort: "git -C {workdir} am --abort"
   add: "git -C {workdir} add -A"
   commit: "git -C {workdir} commit -m '{message}'"
   rollback: "git -C {workdir} reset --hard {state} && git -C {workdir} clean -fd"

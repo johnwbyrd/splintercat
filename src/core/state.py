@@ -32,6 +32,7 @@ class State(BaseModel):
     original_patchset: PatchSet
     results: list[Result] = Field(default_factory=list)
     done: bool = False
+    strategy_data: dict = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
 

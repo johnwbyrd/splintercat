@@ -24,15 +24,17 @@ class Source(ABC):
 class GitSource(Source):
     """Fetches patches from a git repository using git format-patch."""
 
-    def __init__(self, config: SourceConfig, runner: CommandRunner):
+    def __init__(self, config: SourceConfig, runner: CommandRunner, log_truncate_length: int = 60):
         """Initialize GitSource.
 
         Args:
             config: Source configuration with repo, branch, workdir, and commands
             runner: CommandRunner instance for executing git commands
+            log_truncate_length: Max length for patch subjects in logs
         """
         self.config = config
         self.runner = runner
+        self.log_truncate_length = log_truncate_length
 
     def get_patches(self) -> PatchSet:
         """Fetch patches from git repository.
@@ -92,7 +94,9 @@ class GitSource(Source):
             if result.stdout:
                 patch = Patch(id=commit, diff=result.stdout)
                 patches.append(patch)
-                logger.info(f"Generated patch for {commit[:8]}: {patch.subject[:60]}")
+                logger.info(
+                    f"Generated patch for {commit[:8]}: {patch.subject[:self.log_truncate_length]}"
+                )
 
         logger.success(f"Generated {len(patches)} patches")
         return PatchSet(patches)

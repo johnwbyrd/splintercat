@@ -22,6 +22,7 @@ class Commands(BaseModel):
     checkout: str | None = None
     get_state: str | None = None
     apply: str | None = None
+    apply_abort: str | None = None
     add: str | None = None
     commit: str | None = None
     rollback: str | None = None
@@ -55,6 +56,7 @@ class Settings(BaseSettings):
     test_command: str
     interactive: bool = False
     verbose: bool = False
+    log_truncate_length: int = 60
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",

@@ -6,7 +6,7 @@ from src.core.log import logger, setup_logging
 from src.core.source import GitSource
 from src.core.state import State
 from src.core.target import GitTarget
-from src.strategy import SequentialStrategy
+from src.strategy import BisectStrategy
 
 
 class Runner:
@@ -38,9 +38,9 @@ class Runner:
 
         # Create components
         runner = CommandRunner(self.settings.interactive)
-        source = GitSource(self.settings.source, runner)
+        source = GitSource(self.settings.source, runner, self.settings.log_truncate_length)
         target = GitTarget(self.settings.target, self.settings.test_command, runner)
-        strategy = SequentialStrategy()
+        strategy = BisectStrategy()
 
         # Get all patches from source
         original_patches = source.get_patches()

@@ -2,7 +2,6 @@ source:
   repo: https://github.com/llvm/llvm-project.git
   branch: main
   workdir: /home/jbyrd/git/llvm-mos
-  limit: 5
 
 target:
   branch: stable-test

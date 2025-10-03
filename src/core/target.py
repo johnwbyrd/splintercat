@@ -137,6 +137,10 @@ class GitTarget(Target):
                 logger.error(
                     f"Patch {patch.id[:8]} failed to apply (exit code {result.returncode})"
                 )
+                # Clean up git am state
+                self.runner.run(
+                    self.config.commands.apply_abort.format(**self.config.model_dump()), check=False
+                )
                 return False
 
             logger.success(f"Applied patch {patch.id[:8]}")
