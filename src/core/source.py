@@ -62,10 +62,13 @@ class GitSource(Source):
 
         logger.debug(f"Merge-base: {merge_base}")
 
+        # Prepare limit flag for head command
+        limit_flag = f" | head -n {self.config.limit}" if self.config.limit else ""
+
         # List commits from merge-base forward
         result = self.runner.run(
             self.config.commands.list_commits.format(
-                merge_base=merge_base, **self.config.model_dump()
+                merge_base=merge_base, limit_flag=limit_flag, **self.config.model_dump()
             )
         )
         commit_list = result.stdout.strip()

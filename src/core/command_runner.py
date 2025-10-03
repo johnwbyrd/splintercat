@@ -18,13 +18,20 @@ class CommandRunner:
         """
         self.interactive = interactive
 
-    def run(self, cmd: str | list[str], stdin: str | None = None, check: bool = True) -> Result:
+    def run(
+        self,
+        cmd: str | list[str],
+        stdin: str | None = None,
+        check: bool = True,
+        log_level: str = "INFO",
+    ) -> Result:
         """Run a command with optional stdin.
 
         Args:
             cmd: Command string (uses shell) or list of args (no shell)
             stdin: Optional string to pass as stdin
             check: Whether to log warning on failure
+            log_level: Log level for output (INFO, DEBUG, etc.)
 
         Returns:
             Result object with returncode, stdout, stderr
@@ -44,9 +51,9 @@ class CommandRunner:
         )
 
         if stdin:
-            result = self._run_with_stdin(process, stdin)
+            result = self._run_with_stdin(process, stdin, log_level)
         else:
-            result = self._run_with_realtime_output(process)
+            result = self._run_with_realtime_output(process, log_level)
 
         if check and result.returncode != 0 and not self.interactive:
             logger.warning(

@@ -1,10 +1,16 @@
 """Configuration loading from YAML and command-line arguments."""
 
 from pathlib import Path
+from typing import Any, Tuple, Type
 
 import yaml
 from pydantic import BaseModel, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
 
 
 class Commands(BaseModel):
@@ -28,6 +34,7 @@ class SourceConfig(BaseModel):
     repo: str
     branch: str
     workdir: Path
+    limit: int | None = None
     commands: Commands
 
 
@@ -35,8 +42,9 @@ class TargetConfig(BaseModel):
     """Target repository configuration."""
 
     branch: str
-    start_point: str
+    base_ref: str
     workdir: Path
+    force_recreate: bool = False
     commands: Commands
 
 
@@ -54,6 +62,23 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         cli_parse_args=True,
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        """Add YAML config source to settings sources."""
+        return (
+            init_settings,
+            YamlConfigSettingsSource(settings_cls),
+            env_settings,
+            file_secret_settings,
+        )
 
     @model_validator(mode="before")
     @classmethod

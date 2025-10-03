@@ -51,9 +51,16 @@ class GitTarget(Target):
         self.runner = runner
 
     def checkout(self):
-        """Prepare target branch (create if needed, checkout if exists)."""
-        logger.info(f"Checking out target branch: {self.config.branch}")
-        self.runner.run(self.config.commands.checkout.format(**self.config.model_dump()))
+        """Prepare target branch (create or reset based on force_recreate)."""
+        branch_create_flag = "B" if self.config.force_recreate else "b"
+        mode = "Creating/resetting" if self.config.force_recreate else "Creating"
+
+        logger.info(f"{mode} target branch: {self.config.branch} from {self.config.base_ref}")
+        self.runner.run(
+            self.config.commands.checkout.format(
+                branch_create_flag=branch_create_flag, **self.config.model_dump()
+            )
+        )
         logger.success(f"Branch {self.config.branch} ready")
 
     def try_patches(self, patchset: PatchSet) -> bool:
