@@ -18,12 +18,14 @@ class Commands(BaseModel):
     fetch: str
     merge_base: str
     list_commits: str
-    format_patch: str
+    get_commit_info: str | None = None
     check_clean: str | None = None
     checkout: str | None = None
     get_state: str | None = None
     apply: str | None = None
     apply_abort: str | None = None
+    apply_continue: str | None = None
+    apply_skip: str | None = None
     add: str | None = None
     commit: str | None = None
     rollback_reset: str | None = None

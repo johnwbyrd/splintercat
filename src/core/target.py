@@ -7,7 +7,6 @@ from src.core.config import TargetConfig
 from src.core.log import logger
 from src.core.patch import Patch
 from src.core.result import ApplyResult
-from src.patchset import PatchSet
 
 
 class Target(ABC):
@@ -61,7 +60,7 @@ class Target(ABC):
 
 
 class GitTarget(Target):
-    """Applies patches to a git repository and tests them using git am."""
+    """Applies patches to a git repository and tests them using git cherry-pick."""
 
     def __init__(self, config: TargetConfig, test_cmd: str, runner: CommandRunner):
         """Initialize GitTarget.
@@ -105,24 +104,24 @@ class GitTarget(Target):
         return result.stdout.strip()
 
     def apply_one(self, patch: Patch) -> ApplyResult:
-        """Apply a single patch using git am."""
-        logger.info(f"Applying patch {patch.id[:8]}: {patch.subject[:60]}")
+        """Apply a single patch using git cherry-pick."""
+        logger.info(f"Cherry-picking {patch.id[:8]}: {patch.subject[:60]}")
 
-        cmd = self.config.commands.apply.format(**self.config.model_dump())
-        result = self.runner.run(cmd, stdin=patch.diff, check=False)
+        cmd = self.config.commands.apply.format(commit=patch.id, **self.config.model_dump())
+        result = self.runner.run(cmd, check=False)
 
         if result.returncode != 0:
             logger.error(
-                f"Patch {patch.id[:8]} failed to apply (exit code {result.returncode})"
+                f"Cherry-pick {patch.id[:8]} failed (exit code {result.returncode})"
             )
-            # Clean up git am state
+            # Clean up cherry-pick state
             self.runner.run(
                 self.config.commands.apply_abort.format(**self.config.model_dump()),
                 check=False
             )
             return ApplyResult(success=False, failed_patch_id=patch.id)
 
-        logger.success(f"Applied patch {patch.id[:8]}")
+        logger.success(f"Cherry-picked {patch.id[:8]}")
         return ApplyResult(success=True, failed_patch_id=None)
 
     def run_tests(self) -> bool:
@@ -147,7 +146,7 @@ class GitTarget(Target):
         """
         logger.info(f"Rolling back to {state[:8]}")
 
-        # Clean up any git am state first
+        # Clean up any cherry-pick state first
         self.runner.run(
             self.config.commands.apply_abort.format(**self.config.model_dump()),
             check=False
@@ -169,10 +168,10 @@ class GitTarget(Target):
     def commit(self, message: str):
         """Commit the currently applied patches.
 
-        Note: With git am, patches are already committed with proper attribution.
+        Note: With git cherry-pick, patches are already committed with proper attribution.
         This method is for compatibility with the Strategy interface.
 
         Args:
-            message: Commit message (unused with git am)
+            message: Commit message (unused with git cherry-pick)
         """
-        logger.debug("Patches already committed via git am")
+        logger.debug("Patches already committed via git cherry-pick")

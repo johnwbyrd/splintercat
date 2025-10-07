@@ -10,7 +10,7 @@ target:
   workdir: /home/jbyrd/git/llvm-mos
   force_recreate: true
 
-test_command: echo cd {workdir}/build && echo ninja
+test_command: cd {workdir}/build && ninja
 
 strategy: greedy
 interactive: false

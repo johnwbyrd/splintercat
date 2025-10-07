@@ -22,7 +22,7 @@ class Source(ABC):
 
 
 class GitSource(Source):
-    """Fetches patches from a git repository using git format-patch."""
+    """Fetches commits from a git repository for cherry-picking."""
 
     def __init__(self, config: SourceConfig, runner: CommandRunner, log_truncate_length: int = 60):
         """Initialize GitSource.
@@ -43,10 +43,10 @@ class GitSource(Source):
         1. Fetch from remote
         2. Find merge-base between HEAD and FETCH_HEAD
         3. List commits chronologically from merge-base forward
-        4. Generate patches using git format-patch
+        4. Create Patch objects with commit SHAs (no diff generation needed for cherry-pick)
 
         Returns:
-            RangePatchSet containing patches in chronological order
+            PatchSet containing patches in chronological order
         """
         # Fetch latest from upstream
         logger.info(f"Fetching from {self.config.repo} {self.config.branch}")
@@ -82,21 +82,30 @@ class GitSource(Source):
         commits = commit_list.split("\n")
         logger.info(f"Found {len(commits)} commits to process")
 
-        # Generate patches for each commit
+        # Create patch objects for each commit
         patches = []
         for commit in commits:
+            # Get commit info for logging (subject, author, date)
             result = self.runner.run(
-                self.config.commands.format_patch.format(
+                self.config.commands.get_commit_info.format(
                     commit=commit, **self.config.model_dump()
                 ),
                 log_level="DEBUG",
             )
-            if result.stdout:
-                patch = Patch(id=commit, diff=result.stdout)
-                patches.append(patch)
-                logger.info(
-                    f"Generated patch for {commit[:8]}: {patch.subject[:self.log_truncate_length]}"
-                )
 
-        logger.success(f"Generated {len(patches)} patches")
+            # Parse commit info
+            info = {}
+            for line in result.stdout.strip().split("\n"):
+                if ": " in line:
+                    key, value = line.split(": ", 1)
+                    info[key.lower()] = value
+
+            # Create patch with commit SHA (no diff needed for cherry-pick)
+            patch = Patch(id=commit, diff="", metadata=info)
+            patches.append(patch)
+
+            subject = info.get("subject", "")[:self.log_truncate_length]
+            logger.info(f"Found commit {commit[:8]}: {subject}")
+
+        logger.success(f"Collected {len(patches)} commits for cherry-pick")
         return PatchSet(patches)

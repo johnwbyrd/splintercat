@@ -74,7 +74,8 @@ class BisectStrategy(Strategy):
                 current_bisect = None
 
                 logger.warning(
-                    f"Patch {bad_patch_id[:8]} failed to apply - marking as bad and retrying without it"
+                    f"Patch {bad_patch_id[:8]} failed to apply - "
+                    f"marking as bad and retrying without it"
                 )
 
             elif len(last_result.patch_ids) == 1:
