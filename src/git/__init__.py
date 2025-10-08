@@ -1,7 +1,7 @@
 """Git operations and git-imerge integration."""
 
-from src.git.imerge import IMergeWrapper
+from src.git.imerge import IMerge
 
 __all__ = [
-    "IMergeWrapper",
+    "IMerge",
 ]
