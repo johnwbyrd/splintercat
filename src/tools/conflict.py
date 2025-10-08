@@ -31,8 +31,14 @@ class ViewConflictTool:
             "type": "object",
             "properties": {
                 "file": {"type": "string", "description": "File path"},
-                "conflict_num": {"type": "integer", "description": "Conflict number (1-indexed)"},
-                "context_lines": {"type": "integer", "description": "Lines of context (default 10)"},
+                "conflict_num": {
+                    "type": "integer",
+                    "description": "Conflict number (1-indexed)",
+                },
+                "context_lines": {
+                    "type": "integer",
+                    "description": "Lines of context (default 10)",
+                },
             },
             "required": ["file", "conflict_num"],
         }
@@ -137,12 +143,17 @@ class ResolveConflictTool:
                     "enum": ["ours", "theirs", "both", "custom"],
                     "description": "Resolution choice"
                 },
-                "custom_text": {"type": "string", "description": "Custom text (if choice is custom)"},
+                "custom_text": {
+                    "type": "string",
+                    "description": "Custom text (if choice is custom)",
+                },
             },
             "required": ["file", "conflict_num", "choice"],
         }
 
-    def execute(self, file: str, conflict_num: int, choice: str, custom_text: str | None = None) -> str:
+    def execute(
+        self, file: str, conflict_num: int, choice: str, custom_text: str | None = None
+    ) -> str:
         """Execute tool - resolve conflict.
 
         Args:

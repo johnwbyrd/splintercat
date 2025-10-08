@@ -1,6 +1,6 @@
 """LangGraph workflow definition."""
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import END, StateGraph
 
 from src.core.config import Settings
 from src.core.log import logger
@@ -18,14 +18,14 @@ def create_workflow(settings: Settings):
     logger.debug("Building workflow graph")
 
     # Import nodes (lazy to avoid circular imports)
-    from src.workflow.nodes.initialize import initialize
-    from src.workflow.nodes.plan_strategy import plan_strategy
-    from src.workflow.nodes.resolve_conflicts import resolve_conflicts
     from src.workflow.nodes.build_test import build_node, test_node
-    from src.workflow.nodes.summarize_failure import summarize_failure
-    from src.workflow.nodes.plan_recovery import plan_recovery
     from src.workflow.nodes.execute_recovery import execute_recovery
     from src.workflow.nodes.finalize import finalize
+    from src.workflow.nodes.initialize import initialize
+    from src.workflow.nodes.plan_recovery import plan_recovery
+    from src.workflow.nodes.plan_strategy import plan_strategy
+    from src.workflow.nodes.resolve_conflicts import resolve_conflicts
+    from src.workflow.nodes.summarize_failure import summarize_failure
 
     # Build graph
     workflow = StateGraph(dict)

@@ -1,6 +1,6 @@
 """Base recovery interface."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Protocol
 
 

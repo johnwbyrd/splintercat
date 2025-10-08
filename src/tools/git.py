@@ -30,8 +30,14 @@ class GitShowCommitTool:
         return {
             "type": "object",
             "properties": {
-                "ref": {"type": "string", "description": "Git ref (SHA, HEAD, FETCH_HEAD, etc)"},
-                "file": {"type": "string", "description": "Optional: show changes only for this file"},
+                "ref": {
+                    "type": "string",
+                    "description": "Git ref (SHA, HEAD, FETCH_HEAD, etc)",
+                },
+                "file": {
+                    "type": "string",
+                    "description": "Optional: show changes only for this file",
+                },
             },
             "required": ["ref"],
         }

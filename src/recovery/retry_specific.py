@@ -34,7 +34,10 @@ class RetrySpecificRecovery:
         Returns:
             Updated state with specific resolutions cleared
         """
-        logger.info(f"Recovery: retry-specific - re-resolving {len(self.conflicts_to_retry)} conflicts")
+        logger.info(
+            f"Recovery: retry-specific - re-resolving "
+            f"{len(self.conflicts_to_retry)} conflicts"
+        )
 
         # Filter resolutions to keep only those not being retried
         resolutions = state.get("resolutions", [])

@@ -23,7 +23,10 @@ class SplintercatApp:
         Returns:
             Exit code: 0 for success, 1 for failure
         """
-        logger.info(f"Starting merge of {self.settings.source.ref} into {self.settings.target.branch}")
+        logger.info(
+            f"Starting merge of {self.settings.source.ref} "
+            f"into {self.settings.target.branch}"
+        )
 
         # Create and run workflow
         workflow = create_workflow(self.settings)

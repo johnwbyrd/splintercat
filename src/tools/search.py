@@ -31,7 +31,10 @@ class GrepCodebaseTool:
             "type": "object",
             "properties": {
                 "pattern": {"type": "string", "description": "Regex pattern to search"},
-                "file_pattern": {"type": "string", "description": "Optional glob to filter files (e.g. *.cpp)"},
+                "file_pattern": {
+                    "type": "string",
+                    "description": "Optional glob to filter files (e.g. *.cpp)",
+                },
                 "context_lines": {"type": "integer", "description": "Lines of context (default 2)"},
             },
             "required": ["pattern"],
