@@ -90,8 +90,8 @@ class Settings(BaseSettings):
     @model_validator(mode="before")
     @classmethod
     def merge_git_defaults(cls, data):
-        """Merge git command defaults from src/defaults/git.yaml."""
-        defaults_path = Path(__file__).parent.parent / "defaults" / "git.yaml"
+        """Merge git command defaults from src/defaults/commands.yaml."""
+        defaults_path = Path(__file__).parent.parent / "defaults" / "commands.yaml"
 
         if not defaults_path.exists():
             return data

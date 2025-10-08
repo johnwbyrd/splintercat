@@ -1,0 +1,20 @@
+# Default command templates for git and other tools
+# These can be overridden in config.yaml for source/target specific configurations
+
+commands:
+  # Git commands
+  fetch: "git -C {workdir} fetch {repo} {branch}"
+  merge_base: "git -C {workdir} merge-base HEAD FETCH_HEAD"
+  list_commits: "git -C {workdir} rev-list --reverse {merge_base}..FETCH_HEAD{limit_flag}"
+  get_commit_info: "git -C {workdir} show --format='%H%n%an%n%ae%n%at%n%s%n%b' --no-patch {commit}"
+  check_clean: "git -C {workdir} diff-index --quiet HEAD --"
+  checkout: "git -C {workdir} checkout -{branch_create_flag} {branch} {base_ref}"
+  get_state: "git -C {workdir} rev-parse HEAD"
+  apply: "git -C {workdir} cherry-pick {commit}"
+  apply_abort: "git -C {workdir} cherry-pick --abort"
+  apply_continue: "git -C {workdir} cherry-pick --continue"
+  apply_skip: "git -C {workdir} cherry-pick --skip"
+  add: "git -C {workdir} add -A"
+  commit: "git -C {workdir} commit -m '{message}'"
+  rollback_reset: "git -C {workdir} reset --hard {state}"
+  rollback_clean: "git -C {workdir} clean -fd"
