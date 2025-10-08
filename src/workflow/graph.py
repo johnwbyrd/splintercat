@@ -1,20 +1,152 @@
-"""LangGraph state machine definition and routing logic."""
+"""LangGraph workflow definition."""
+
+from langgraph.graph import StateGraph, END
+
+from src.core.config import Settings
+from src.core.log import logger
 
 
-def create_workflow():
-    """Create and configure the LangGraph workflow.
+def create_workflow(settings: Settings):
+    """Create the merge workflow graph.
 
-    Defines nodes, edges, and routing logic for the merge workflow state machine.
-
-    Routing logic:
-    - BuildTest result: success -> Finalize, failure -> SummarizeFailure
-    - PlanRecovery decision routing:
-      - retry (retry-all or retry-specific) -> ResolveConflicts with failure context
-      - bisect -> BuildTest with resolution subset
-      - switch-strategy -> PlanStrategy
-      - abort -> END
+    Args:
+        settings: Application configuration
 
     Returns:
-        Configured LangGraph workflow
+        Compiled LangGraph workflow
     """
-    pass
+    logger.debug("Building workflow graph")
+
+    # Import nodes (lazy to avoid circular imports)
+    from src.workflow.nodes.initialize import initialize
+    from src.workflow.nodes.plan_strategy import plan_strategy
+    from src.workflow.nodes.resolve_conflicts import resolve_conflicts
+    from src.workflow.nodes.build_test import build_node, test_node
+    from src.workflow.nodes.summarize_failure import summarize_failure
+    from src.workflow.nodes.plan_recovery import plan_recovery
+    from src.workflow.nodes.execute_recovery import execute_recovery
+    from src.workflow.nodes.finalize import finalize
+
+    # Build graph
+    workflow = StateGraph(dict)
+
+    # Add nodes
+    workflow.add_node("initialize", initialize)
+    workflow.add_node("plan_strategy", plan_strategy)
+    workflow.add_node("resolve_conflicts", resolve_conflicts)
+    workflow.add_node("build", build_node)
+    workflow.add_node("test", test_node)
+    workflow.add_node("summarize_failure", summarize_failure)
+    workflow.add_node("plan_recovery", plan_recovery)
+    workflow.add_node("execute_recovery", execute_recovery)
+    workflow.add_node("finalize", finalize)
+
+    # Define edges
+    workflow.set_entry_point("initialize")
+    workflow.add_edge("initialize", "plan_strategy")
+    workflow.add_edge("plan_strategy", "resolve_conflicts")
+
+    # After resolving conflicts, build
+    workflow.add_edge("resolve_conflicts", "build")
+
+    # After build: conditional routing
+    workflow.add_conditional_edges(
+        "build",
+        _after_build,
+        {
+            "test": "test",
+            "resolve_conflicts": "resolve_conflicts",
+            "summarize_failure": "summarize_failure",
+        }
+    )
+
+    # After test: conditional routing
+    workflow.add_conditional_edges(
+        "test",
+        _after_test,
+        {
+            "finalize": "finalize",
+            "resolve_conflicts": "resolve_conflicts",
+            "summarize_failure": "summarize_failure",
+        }
+    )
+
+    workflow.add_edge("summarize_failure", "plan_recovery")
+
+    # After recovery planning: conditional routing
+    workflow.add_conditional_edges(
+        "plan_recovery",
+        _after_recovery_plan,
+        {
+            "execute_recovery": "execute_recovery",
+            "plan_strategy": "plan_strategy",
+            END: END,
+        }
+    )
+
+    workflow.add_edge("execute_recovery", "resolve_conflicts")
+    workflow.add_edge("finalize", END)
+
+    return workflow.compile()
+
+
+def _after_build(state: dict) -> str:
+    """Route after build node.
+
+    Args:
+        state: Current state
+
+    Returns:
+        Next node name
+    """
+    build_result = state.get("build_result")
+
+    if not build_result or not build_result.success:
+        return "summarize_failure"
+
+    # Build passed - run tests
+    return "test"
+
+
+def _after_test(state: dict) -> str:
+    """Route after test node.
+
+    Args:
+        state: Current state
+
+    Returns:
+        Next node name
+    """
+    test_result = state.get("test_result")
+
+    if not test_result or not test_result.success:
+        return "summarize_failure"
+
+    # Tests passed - check if more conflicts
+    if state.get("conflicts_remaining"):
+        return "resolve_conflicts"
+
+    # All done
+    return "finalize"
+
+
+def _after_recovery_plan(state: dict) -> str:
+    """Route after recovery planning.
+
+    Args:
+        state: Current state
+
+    Returns:
+        Next node name
+    """
+    decision = state.get("recovery_decision")
+
+    if not decision:
+        return END
+
+    if decision.decision == "abort":
+        return END
+    elif decision.decision == "switch_strategy":
+        return "plan_strategy"
+    else:
+        return "execute_recovery"
