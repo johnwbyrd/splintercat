@@ -3,3 +3,4 @@ pydantic-settings>=2.0
 loguru>=0.7.0
 langchain>=0.1.0
 langchain-openai>=0.0.5
+git-imerge>=1.2.0
