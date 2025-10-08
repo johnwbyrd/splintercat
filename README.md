@@ -17,7 +17,7 @@ The result is a single clean merge commit that preserves all original commit has
 
 **Current Phase**: Design complete, implementation pending
 
-The architecture is designed and documented in [doc/DESIGN.md](doc/DESIGN.md). Implementation will begin when we encounter real-world merge scenarios that simpler tools cannot handle.
+The architecture is designed and documented in [doc/design.md](doc/design.md). Implementation will begin when we encounter real-world merge scenarios that simpler tools cannot handle.
 
 ## Design Philosophy
 
@@ -106,19 +106,20 @@ All decisions and actions are logged to console and `splintercat.log`.
 
 ## Documentation
 
-- [doc/DESIGN.md](doc/DESIGN.md) - Complete architecture and design
-- [doc/LLM.md](doc/LLM.md) - Instructions for LLM assistants working on this codebase
+- [doc/design.md](doc/design.md) - Complete architecture and design
+- [doc/llm.md](doc/llm.md) - Instructions for LLM assistants working on this codebase
+- [doc/merge-resolver.md](doc/merge-resolver.md) - Tool-based conflict resolution architecture
 - [doc/gitimerge.py](doc/gitimerge.py) - Reference copy of git-imerge source for understanding the library
 
 ## Development
 
-See [doc/LLM.md](doc/LLM.md) for development guidelines.
+See [doc/llm.md](doc/llm.md) for development guidelines.
 
 Key points:
 - Virtual environment: `source ../.venv/bin/activate`
 - No emojis anywhere
 - No code blocks in markdown documentation
-- DESIGN.md is the source of truth for architecture
+- design.md is the source of truth for architecture
 - Don't implement until needed for real-world merge cases
 
 ## Why This Exists

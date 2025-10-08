@@ -108,5 +108,5 @@ interactive: false  # Set to true to prompt before each command
 #     --verbose=true
 #     --merge.max_retries=10
 #
-# - See doc/DESIGN.md for complete architecture and design details
-# - See doc/TODO.md for implementation roadmap
+# - See doc/design.md for complete architecture and design details
+# - See doc/todo.md for implementation roadmap
