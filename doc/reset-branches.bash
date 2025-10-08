@@ -17,6 +17,12 @@ fi
 # Navigate to repository
 cd "$REPO_DIR"
 
+# Abort any in-progress operations and clean working directory
+echo "Cleaning working directory..."
+git merge --abort 2>/dev/null || true
+git reset --hard 2>/dev/null || true
+git clean -fd 2>/dev/null || true
+
 # Delete stable-test branch if it exists
 echo "Deleting stable-test branch if it exists..."
 git branch -D stable-test 2>/dev/null || echo "  (branch didn't exist)"

@@ -37,24 +37,25 @@ build_test:
 # MODEL - Language model configuration
 # ==============================================================================
 model:
-  # OpenRouter API key (use environment variable for security)
-  # Can be set via environment variable: SPLINTERCAT__MODEL__API_KEY=sk-...
-  api_key: ""
+  # OpenRouter API key
+  # Set via .env file: MODEL__API_KEY=sk-...
+  # Or environment variable: SPLINTERCAT__MODEL__API_KEY=sk-...
+  # api_key: ""  # Leave commented out to use .env or environment variable
 
   # OpenRouter API base URL
   base_url: https://openrouter.ai/api/v1
 
   # Model for conflict resolution (cheap/fast model recommended)
   # Resolves merge conflicts mechanically
-  resolver_model: openai/gpt-4o-mini
+  resolver_model: deepseek/deepseek-v3.2-exp
 
   # Model for build log summarization (cheap/fast model recommended)
   # Extracts failure information from verbose build logs
-  summarizer_model: openai/gpt-4o-mini
+  summarizer_model: deepseek/deepseek-v3.2-exp
 
   # Model for strategic planning (smart/expensive model recommended)
   # Makes decisions about merge strategy and recovery
-  planner_model: anthropic/claude-sonnet-4
+  planner_model: deepseek/deepseek-v3.2-exp
 
 # ==============================================================================
 # GIT-IMERGE - Merge subdivision configuration

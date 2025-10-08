@@ -72,6 +72,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
+        env_file=".env",
         env_nested_delimiter="__",
         cli_parse_args=True,
     )
@@ -89,6 +90,7 @@ class Settings(BaseSettings):
         return (
             init_settings,
             YamlConfigSettingsSource(settings_cls),
+            dotenv_settings,
             env_settings,
             file_secret_settings,
         )
