@@ -15,7 +15,7 @@ def build_node(state: MergeWorkflowState) -> MergeWorkflowState:
     pass
 
 
-def test_node(state: MergeWorkflowState) -> MergeWorkflowState:
+def run_tests(state: MergeWorkflowState) -> MergeWorkflowState:
     """Run test command, save logs, determine success/failure.
 
     Args:

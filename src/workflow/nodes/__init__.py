@@ -1,6 +1,6 @@
 """Workflow nodes for LangGraph state machine."""
 
-from src.workflow.nodes.build_test import build_node, test_node
+from src.workflow.nodes.build_test import build_node, run_tests
 from src.workflow.nodes.execute_recovery import execute_recovery
 from src.workflow.nodes.finalize import finalize
 from src.workflow.nodes.initialize import initialize
@@ -14,7 +14,7 @@ __all__ = [
     "plan_strategy",
     "resolve_conflicts",
     "build_node",
-    "test_node",
+    "run_tests",
     "summarize_failure",
     "plan_recovery",
     "execute_recovery",
