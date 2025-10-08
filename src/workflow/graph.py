@@ -4,6 +4,7 @@ from langgraph.graph import END, StateGraph
 
 from src.core.config import Settings
 from src.core.log import logger
+from src.state.workflow import MergeWorkflowState
 
 
 def create_workflow(settings: Settings):
@@ -28,7 +29,7 @@ def create_workflow(settings: Settings):
     from src.workflow.nodes.summarize_failure import summarize_failure
 
     # Build graph
-    workflow = StateGraph(dict)
+    workflow = StateGraph(MergeWorkflowState)
 
     # Add nodes
     workflow.add_node("initialize", initialize)
@@ -90,7 +91,7 @@ def create_workflow(settings: Settings):
     return workflow.compile()
 
 
-def _after_build(state: dict) -> str:
+def _after_build(state: MergeWorkflowState) -> str:
     """Route after build node.
 
     Args:
@@ -99,7 +100,7 @@ def _after_build(state: dict) -> str:
     Returns:
         Next node name
     """
-    build_result = state.get("build_result")
+    build_result = getattr(state, "build_result", None)
 
     if not build_result or not build_result.success:
         return "summarize_failure"
@@ -108,7 +109,7 @@ def _after_build(state: dict) -> str:
     return "test"
 
 
-def _after_test(state: dict) -> str:
+def _after_test(state: MergeWorkflowState) -> str:
     """Route after test node.
 
     Args:
@@ -117,20 +118,20 @@ def _after_test(state: dict) -> str:
     Returns:
         Next node name
     """
-    test_result = state.get("test_result")
+    test_result = getattr(state, "test_result", None)
 
     if not test_result or not test_result.success:
         return "summarize_failure"
 
     # Tests passed - check if more conflicts
-    if state.get("conflicts_remaining"):
+    if getattr(state, "conflicts_remaining", False):
         return "resolve_conflicts"
 
     # All done
     return "finalize"
 
 
-def _after_recovery_plan(state: dict) -> str:
+def _after_recovery_plan(state: MergeWorkflowState) -> str:
     """Route after recovery planning.
 
     Args:
@@ -139,7 +140,7 @@ def _after_recovery_plan(state: dict) -> str:
     Returns:
         Next node name
     """
-    decision = state.get("recovery_decision")
+    decision = getattr(state, "recovery_decision", None)
 
     if not decision:
         return END

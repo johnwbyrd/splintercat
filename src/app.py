@@ -49,14 +49,13 @@ class SplintercatApp:
             Initial state dictionary
         """
         return {
-            "settings": self.settings,
+            "imerge_name": self.settings.imerge.name,
+            "workdir": self.settings.target.workdir,
             "source_ref": self.settings.source.ref,
             "target_branch": self.settings.target.branch,
-            "workdir": self.settings.target.workdir,
-            "imerge_name": self.settings.imerge.name,
-            "current_attempt": 0,
-            "attempt_history": [],
-            "conflicts_remaining": True,
+            "current_strategy": "",
+            "conflicts_in_batch": [],
+            "attempts": [],
             "resolutions": [],
             "status": "initialized",
         }
