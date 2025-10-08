@@ -2,7 +2,18 @@
 
 ## Development Environment
 
-- **Virtual environment** - Python tools are in `../.venv/bin/` - source `../.venv/bin/activate` before running ruff, python, pip, etc.
+- **Virtual environment** - Python tools are in `../.venv/bin/` - source `../.venv/bin/activate` before running ruff, python, pip, etc. If you need some new Python package, update requirements.txt
+
+- **Running tests:**
+
+You MUST run source ../.venv/bin/activate && [...] before running any Python command.
+
+```bash
+source ../.venv/bin/activate
+pytest                    # All tests
+pytest tests/test_buildrunner.py -v  # Just BuildRunner
+ruff check                # Linting
+```
 
 ## Git Repository Structure
 
