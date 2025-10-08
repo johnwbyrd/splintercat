@@ -1,5 +1,5 @@
 # Splintercat Configuration
-# LLM-assisted git merge conflict resolution with build/test validation
+# Model-assisted git merge conflict resolution with build/test validation
 
 # ==============================================================================
 # SOURCE - What to merge from
@@ -11,8 +11,11 @@ source:
 # TARGET - Where to merge to
 # ==============================================================================
 target:
-  workdir: /home/jbyrd/git/llvm-mos  # Path to git repository
-  branch: stable-test  # Branch to merge into
+  # Directory containing the local git repository sources
+  workdir: /home/jbyrd/git/llvm-mos
+
+  # Branch to merge into
+  branch: stable-test
 
 # ==============================================================================
 # BUILD/TEST - Validation command
@@ -20,21 +23,23 @@ target:
 build_test:
   # Command to run for build/test validation
   # Runs after conflict resolution to verify correctness
-  command: cd {workdir}/build && ninja check-llvm
+  # Template {target.workdir} is replaced with target.workdir value
+  command: "cd {target.workdir}/build && ninja check-llvm"
 
-  # Directory for build log storage (one timestamped file per attempt)
-  output_dir: {workdir}/.splintercat/build-logs
+  # Directory for storing build/test log files (one timestamped file per attempt)
+  # Template {target.workdir} is replaced with target.workdir value
+  output_dir: "{target.workdir}/.splintercat/build-logs"
 
   # Maximum time allowed for build/test (seconds)
-  # Default: 14400 (4 hours)
-  timeout: 14400
+  timeout: 14400  # 4 hours
 
 # ==============================================================================
-# LLM - Language model configuration
+# MODEL - Language model configuration
 # ==============================================================================
-llm:
+model:
   # OpenRouter API key (use environment variable for security)
-  api_key: ${OPENROUTER_API_KEY}
+  # Can be set via environment variable: SPLINTERCAT__MODEL__API_KEY=sk-...
+  api_key: ""
 
   # OpenRouter API base URL
   base_url: https://openrouter.ai/api/v1
@@ -82,13 +87,25 @@ merge:
 # ==============================================================================
 # LOGGING - Output configuration
 # ==============================================================================
-# verbose: false  # Set to true for DEBUG level console output (optional)
-# interactive: false  # Set to true to prompt before each command (optional)
+verbose: false  # Set to true for DEBUG level console output
+interactive: false  # Set to true to prompt before each command
 
 # ==============================================================================
 # NOTES
 # ==============================================================================
-# - Environment variables can override any setting: SPLINTERCAT__LLM__API_KEY=...
-# - Command-line args can override: --llm.planner_model=...
+# - Template substitution: {target.workdir} gets replaced with target.workdir value
+#
+# - Environment variables can override any setting using double underscore delimiter:
+#   Examples:
+#     SPLINTERCAT__MODEL__API_KEY=sk-your-key-here
+#     SPLINTERCAT__VERBOSE=true
+#     SPLINTERCAT__MERGE__MAX_RETRIES=10
+#
+# - Command-line args can override settings:
+#   Examples:
+#     --model.planner_model=anthropic/claude-opus-4
+#     --verbose=true
+#     --merge.max_retries=10
+#
 # - See doc/DESIGN.md for complete architecture and design details
-# - Current status: Design complete, implementation pending
+# - See doc/TODO.md for implementation roadmap

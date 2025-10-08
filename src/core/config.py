@@ -1,8 +1,8 @@
 """Configuration loading from YAML and command-line arguments."""
 
+import re
 from pathlib import Path
 
-import yaml
 from pydantic import BaseModel, model_validator
 from pydantic_settings import (
     BaseSettings,
@@ -12,57 +12,63 @@ from pydantic_settings import (
 )
 
 
-class Commands(BaseModel):
-    """Git command templates."""
+class SourceRef(BaseModel):
+    """Source git reference to merge from."""
 
-    fetch: str
-    merge_base: str
-    list_commits: str
-    get_commit_info: str | None = None
-    check_clean: str | None = None
-    checkout: str | None = None
-    get_state: str | None = None
-    apply: str | None = None
-    apply_abort: str | None = None
-    apply_continue: str | None = None
-    apply_skip: str | None = None
-    add: str | None = None
-    commit: str | None = None
-    rollback_reset: str | None = None
-    rollback_clean: str | None = None
-
-
-class SourceConfig(BaseModel):
-    """Source repository configuration."""
-
-    repo: str
-    branch: str
-    workdir: Path
-    limit: int | None = None
-    commands: Commands
+    ref: str
 
 
 class TargetConfig(BaseModel):
     """Target repository configuration."""
 
-    branch: str
-    base_ref: str
     workdir: Path
-    force_recreate: bool = False
-    preserve_build_artifacts: bool = True
-    commands: Commands
+    branch: str
+
+
+class ModelConfig(BaseModel):
+    """Model (LLM) configuration."""
+
+    api_key: str
+    base_url: str
+    resolver_model: str
+    summarizer_model: str
+    planner_model: str
+
+
+class BuildTestConfig(BaseModel):
+    """Build and test validation configuration."""
+
+    command: str
+    output_dir: Path
+    timeout: int
+
+
+class IMergeConfig(BaseModel):
+    """git-imerge configuration."""
+
+    name: str
+    goal: str
+
+
+class MergeConfig(BaseModel):
+    """Merge strategy and recovery configuration."""
+
+    max_retries: int
+    strategies_available: list[str]
+    default_batch_size: int
 
 
 class Settings(BaseSettings):
     """Application settings loaded from YAML, env vars, and CLI args."""
 
-    source: SourceConfig
+    source: SourceRef
     target: TargetConfig
-    test_command: str
-    strategy: str = "greedy"
-    interactive: bool = False
+    build_test: BuildTestConfig
+    model: ModelConfig
+    imerge: IMergeConfig
+    merge: MergeConfig
     verbose: bool = False
-    log_truncate_length: int = 60
+    interactive: bool = False
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
@@ -87,37 +93,38 @@ class Settings(BaseSettings):
             file_secret_settings,
         )
 
-    @model_validator(mode="before")
-    @classmethod
-    def merge_git_defaults(cls, data):
-        """Merge git command defaults from src/defaults/commands.yaml."""
-        defaults_path = Path(__file__).parent.parent / "defaults" / "commands.yaml"
+    @model_validator(mode="after")
+    def substitute_templates(self) -> "Settings":
+        """Substitute template variables like {target.workdir} in string fields."""
+        # Substitute in build_test.command
+        self.build_test.command = self._substitute_string(self.build_test.command)
 
-        if not defaults_path.exists():
-            return data
+        # Substitute in build_test.output_dir (Path type, convert to string and back)
+        output_dir_str = str(self.build_test.output_dir)
+        output_dir_substituted = self._substitute_string(output_dir_str)
+        self.build_test.output_dir = Path(output_dir_substituted)
 
-        with open(defaults_path) as f:
-            defaults = yaml.safe_load(f)
+        return self
 
-        if "commands" not in defaults:
-            return data
+    def _substitute_string(self, value: str) -> str:
+        """Replace {field.path} templates with actual field values.
 
-        default_commands = defaults["commands"]
+        Args:
+            value: String possibly containing {field.path} templates
 
-        # Merge commands for source
-        if "source" in data:
-            if "commands" not in data["source"]:
-                data["source"]["commands"] = {}
-            for key, value in default_commands.items():
-                if key not in data["source"]["commands"] or not data["source"]["commands"][key]:
-                    data["source"]["commands"][key] = value
+        Returns:
+            String with templates replaced by actual values
+        """
+        def replace_template(match):
+            field_path = match.group(1)
+            parts = field_path.split(".")
 
-        # Merge commands for target
-        if "target" in data:
-            if "commands" not in data["target"]:
-                data["target"]["commands"] = {}
-            for key, value in default_commands.items():
-                if key not in data["target"]["commands"] or not data["target"]["commands"][key]:
-                    data["target"]["commands"][key] = value
+            # Navigate through nested fields
+            obj = self
+            for part in parts:
+                obj = getattr(obj, part)
 
-        return data
+            return str(obj)
+
+        # Find all {field.path} patterns and replace them
+        return re.sub(r'\{([a-z._]+)\}', replace_template, value)

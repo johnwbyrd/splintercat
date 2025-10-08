@@ -14,7 +14,10 @@ from src.core.log import logger, setup_logging
 
 def get_conflicted_files(runner, workdir):
     """Get list of files with merge conflicts."""
-    result = runner.run(["git", "-C", str(workdir), "diff", "--name-only", "--diff-filter=U"], check=False)
+    result = runner.run(
+        ["git", "-C", str(workdir), "diff", "--name-only", "--diff-filter=U"],
+        check=False,
+    )
     if not result.stdout.strip():
         return []
     files = result.stdout.strip().split("\n")
@@ -113,7 +116,9 @@ def main():
 
     # Commit the merge
     logger.info("Committing merge...")
-    runner.run(["git", "-C", str(workdir), "commit", "-m", f"Merge {source_ref} with LLM assistance"])
+    runner.run(
+        ["git", "-C", str(workdir), "commit", "-m", f"Merge {source_ref} with LLM assistance"]
+    )
     logger.success("Merge complete!")
 
 

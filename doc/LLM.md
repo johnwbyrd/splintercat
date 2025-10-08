@@ -15,6 +15,7 @@ The llvm-mos repository has multiple remotes for testing:
 ## Code Style
 
 - **NO EMOJIS** - Do not use emojis anywhere in code, comments, docstrings, commit messages, or markdown files
+- Use ruff - Run ruff check after major changes and make sure to clean up any problems
 
 ## Documentation Style
 
