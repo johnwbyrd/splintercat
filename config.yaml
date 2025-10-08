@@ -1,16 +1,94 @@
+# Splintercat Configuration
+# LLM-assisted git merge conflict resolution with build/test validation
+
+# ==============================================================================
+# SOURCE - What to merge from
+# ==============================================================================
 source:
-  repo: https://github.com/llvm/llvm-project.git
-  branch: main
-  workdir: /home/jbyrd/git/llvm-mos
-  limit: 100
+  ref: heaven/main  # Git ref to merge (branch, tag, or commit)
 
+# ==============================================================================
+# TARGET - Where to merge to
+# ==============================================================================
 target:
-  branch: stable-test
-  base_ref: main
-  workdir: /home/jbyrd/git/llvm-mos
-  force_recreate: true
+  workdir: /home/jbyrd/git/llvm-mos  # Path to git repository
+  branch: stable-test  # Branch to merge into
 
-test_command: cd {workdir}/build && ninja
+# ==============================================================================
+# BUILD/TEST - Validation command
+# ==============================================================================
+build_test:
+  # Command to run for build/test validation
+  # Runs after conflict resolution to verify correctness
+  command: cd {workdir}/build && ninja check-llvm
 
-strategy: greedy
-interactive: false
+  # Directory for build log storage (one timestamped file per attempt)
+  output_dir: {workdir}/.splintercat/build-logs
+
+  # Maximum time allowed for build/test (seconds)
+  # Default: 14400 (4 hours)
+  timeout: 14400
+
+# ==============================================================================
+# LLM - Language model configuration
+# ==============================================================================
+llm:
+  # OpenRouter API key (use environment variable for security)
+  api_key: ${OPENROUTER_API_KEY}
+
+  # OpenRouter API base URL
+  base_url: https://openrouter.ai/api/v1
+
+  # Model for conflict resolution (cheap/fast model recommended)
+  # Resolves merge conflicts mechanically
+  resolver_model: openai/gpt-4o-mini
+
+  # Model for build log summarization (cheap/fast model recommended)
+  # Extracts failure information from verbose build logs
+  summarizer_model: openai/gpt-4o-mini
+
+  # Model for strategic planning (smart/expensive model recommended)
+  # Makes decisions about merge strategy and recovery
+  planner_model: anthropic/claude-sonnet-4
+
+# ==============================================================================
+# GIT-IMERGE - Merge subdivision configuration
+# ==============================================================================
+imerge:
+  # Name for this merge operation (used in git refs)
+  name: llvm-upstream-merge
+
+  # Goal determines final merge structure
+  # 'merge' produces a single two-parent merge commit (recommended)
+  # Other options: 'rebase', 'rebase-with-history', 'full'
+  goal: merge
+
+# ==============================================================================
+# MERGE - Strategy and recovery configuration
+# ==============================================================================
+merge:
+  # Maximum number of recovery attempts before aborting
+  max_retries: 5
+
+  # Available strategies for Planner to choose from:
+  # - optimistic: resolve all conflicts, then test once (fastest, risky)
+  # - batch: resolve N conflicts, test, repeat (balanced)
+  # - per_conflict: resolve one, test, repeat (slowest, safest)
+  strategies_available: [optimistic, batch, per_conflict]
+
+  # Default batch size if using batch strategy
+  default_batch_size: 10
+
+# ==============================================================================
+# LOGGING - Output configuration
+# ==============================================================================
+# verbose: false  # Set to true for DEBUG level console output (optional)
+# interactive: false  # Set to true to prompt before each command (optional)
+
+# ==============================================================================
+# NOTES
+# ==============================================================================
+# - Environment variables can override any setting: SPLINTERCAT__LLM__API_KEY=...
+# - Command-line args can override: --llm.planner_model=...
+# - See doc/DESIGN.md for complete architecture and design details
+# - Current status: Design complete, implementation pending

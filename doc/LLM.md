@@ -46,6 +46,13 @@ class Source(ABC):
 **Bad - Code Example:**
 "Here's how SequentialStrategy works: [50 lines of Python code]"
 
+## Implementation Timing
+
+- **DO NOT implement until needed** - Wait for real-world merge cases that simpler tools cannot handle
+- **DESIGN.md is source of truth** - Architecture is designed and documented in doc/DESIGN.md
+- **Configuration-driven** - Settings belong in config.yaml, not hardcoded in Python
+- **Prove it works first** - Build MVP, test on real data, learn from failures
+
 ## Summary
 
 - Code belongs in `.py` files
@@ -53,3 +60,4 @@ class Source(ABC):
 - Keep them separate
 - No emojis anywhere
 - No code blocks in markdown
+- Don't implement until we encounter problems that require the solution
