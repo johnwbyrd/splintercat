@@ -1,4 +1,4 @@
-# Merge Resolver Design - Tool-Based LLM Conflict Resolution
+# Merge Resolver Design - File-Based Conflict Resolution
 
 ## Problem Statement
 
@@ -11,402 +11,952 @@ Traditional LLM approaches to merge conflict resolution fail because they requir
 
 ### Real-World Example
 
-File: `llvm/tools/llvm-readobj/ELFDumper.cpp`
+File: llvm/tools/llvm-readobj/ELFDumper.cpp
 - Size: 8,896 lines
 - Conflicts: 1 conflict at line 1139 (80 lines of enum entries)
 - Problem: LLM must regenerate 8,896 lines perfectly to resolve an 80-line conflict
 
-## Solution: Tool-Based Resolution
+## Solution: File-Based Composition
 
-Instead of treating the LLM as a text generator, treat it as an **analyst with tools**.
+Instead of treating the LLM as a text generator, treat it as an **analyst working with files**.
 
-### Key Insight
+### Core Insight
 
-LLMs should:
-1. **Observe** the conflict with context
-2. **Investigate** using tools to understand intent
-3. **Reason** about the best resolution
-4. **Question** when uncertain
-5. **Execute** precise edits using tools
-6. **Explain** their reasoning
+Merge conflict resolution is fundamentally about **selecting and concatenating sections**:
+- Choose which version (base, ours, theirs) to use
+- Combine sections in the right order
+- Preserve surrounding context
 
-LLMs work best with chunks of text and context, not regenerating entire files.
+This maps naturally to file operations:
+- Each conflict section is a separate file
+- Resolution is file concatenation
+- Simple, composable, debuggable
 
-## Architecture: Layered Tools
+### Unix Philosophy
 
-### Layer 1: Core Conflict Tools (MVP)
+The design follows Unix principles:
+- Small, focused tools that do one thing well
+- Files as the primary interface
+- Composition through concatenation
+- Human-readable intermediate artifacts
 
-Minimal tools to view and resolve conflicts.
+## Integration with git-imerge
 
-**Tools:**
+Splintercat uses git-imerge to subdivide large merges into pairwise commit merges. The resolver operates within this framework:
+
+### Conflict Granularity
+
+git-imerge provides:
+- Conflict pairs: (i1, i2) representing one commit from each branch
+- Multiple files may have conflicts in a single pair
+- Multiple hunks may exist within a single file
+
+The resolver processes:
+1. Each conflict pair from git-imerge
+2. Each file with conflicts in that pair
+3. Each hunk within each file
+
+### Workflow Integration
+
 ```
-view_conflict(file, conflict_num, context_lines=10)
-  Shows conflict with surrounding context (default 10 lines before/after)
-
-view_more_context(file, conflict_num, before=N, after=N)
-  Expands context when LLM needs more information
-
-resolve_conflict(file, conflict_num, choice, custom_text=None)
-  Resolves conflict with choice: "ours" | "theirs" | "both" | "custom"
-```
-
-**Example Output:**
-```
-File: llvm/include/llvm/CodeGen/LiveRangeEdit.h
-Conflict 1 of 2 (at logical position in class definition):
-
-  70:   MachineRegisterInfo &MRI;
-  71:   LiveIntervals &LIS;
-  72:   VirtRegMap *VRM;
-  73:   const TargetInstrInfo &TII;
-  74:   Delegate *const TheDelegate;
-  75:
-  76:   const unsigned FirstNew;
-  77:
-  78: <<<<<<< HEAD
-  79:   bool EnableRemat = true;
-  80:   bool ScannedRemattable = false;
-  81:
-  82: =======
-  83: >>>>>>> heaven/main
-  84:   /// DeadRemats - The saved instructions which have already been dead
-  85:   SmallVector<MachineInstr *, 32> DeadRemats;
-```
-
-### Layer 2: Basic Investigation Tools
-
-Understand why changes were made and see the bigger picture.
-
-**Tools:**
-```
-git_show_commit(ref, file)
-  Shows commit message and changes for why this file was modified
-
-git_log(file, max_count=10)
-  Shows recent history of file changes
-
-show_merge_summary()
-  Overview: "Merging X into Y, N files with M total conflicts"
-
-list_all_conflicts()
-  Shows all conflicts across all files in this merge
+git-imerge identifies conflict pair (i1, i2)
+  ↓
+For each file with conflicts:
+  ↓
+  For each hunk in file:
+    ↓
+    Create conflict workspace with files
+    ↓
+    LLM: Read files → Investigate → Compose resolution → Submit
+    ↓
+  Apply resolution to actual file
+  ↓
+git-imerge continue (advances to next conflict pair)
 ```
 
-**Use Case:**
-LLM sees a large deletion and wonders why. Calls `git_show_commit("heaven/main", "ELFDumper.cpp")` and learns: "Cleanup: removed unused architecture types". This context helps decide whether to keep or remove code.
+### State Preservation
 
-### Layer 3: Codebase Search Tools
+git-imerge maintains state in refs/imerge/name/, allowing:
+- Resume after interruption
+- Track which commit pairs are complete
+- Bisect to find problematic merges
 
-Search and understand the codebase to make informed decisions.
+The resolver leverages this by coordinating with the strategy system to decide when to build/test.
 
-**Tools:**
+## Conflict Workspace
+
+For each conflict hunk, we create a workspace directory containing files that represent the conflict.
+
+### Workspace Structure
+
 ```
-grep_codebase(pattern, file_pattern=None)
-  Search for pattern across codebase
-  Example: grep_codebase("EM_MOS") finds MOS-specific references
+/tmp/conflict_<id>/
+  base.txt         - Content from merge base (common ancestor)
+  ours.txt         - Content from our branch (HEAD)
+  theirs.txt       - Content from their branch (incoming)
+  before.txt       - Context before conflict (required in resolution)
+  after.txt        - Context after conflict (required in resolution)
 
-grep_in_file(file, pattern)
-  Search within a specific file
-```
-
-**Use Case:**
-LLM sees `EnableRemat` being deleted. Calls `grep_codebase("EnableRemat")` to find if it's used elsewhere. If not found, safely accepts deletion. If found, investigates further.
-
-### Layer 4: Language Server Integration (Future)
-
-Deep semantic understanding when language server (like clangd) is available.
-
-**Tools:**
-```
-query_language_server(file, line, query_type)
-  query_type: "definition" | "references" | "hover" | "signature"
-
-get_type_info(file, symbol)
-  Get type information for a symbol
-
-get_function_signature(file, function_name)
-  Get function signature and documentation
-
-check_syntax(file)
-  Verify file compiles after resolution
+  [LLM can create additional files as needed]
 ```
 
-**Use Case:**
-LLM is unsure if deleted method is still needed. Calls `query_language_server(file, method_name, "references")` to see all callers. If no callers exist, safe to delete.
+### File Metadata
 
-### Layer 5: Extended Context (Future)
+Each file has associated metadata:
+- **Content**: The actual file content
+- **Description**: What this file represents
+- **Line count**: Number of lines
+- **Required**: Whether it must be in final resolution
 
-Additional context from external sources when available.
+This metadata is shown when listing files, making the workspace self-documenting.
 
-**Tools:**
+### Example Workspace
+
+For the LiveRangeEdit.h conflict:
+
 ```
-search_documentation(query)
-  Search external documentation (via MCP or web)
+/tmp/conflict_LiveRangeEdit_h_hunk_0/
+  base.txt (2 lines)
+    Content from merge base - both member variables present
 
-fetch_url(url)
-  Fetch external information
+  ours.txt (2 lines)
+    Content from our branch (HEAD) - unchanged from base
 
-ask_human(question)
-  Ask human for clarification (interactive mode only)
-```
+  theirs.txt (0 lines)
+    Content from their branch (upstream) - deleted both variables
 
-**Use Case:**
-LLM encounters unfamiliar API change. Calls `search_documentation("LLVM LiveInterval API changes")` to understand upstream refactoring.
+  before.txt (10 lines)
+    Context before conflict - MUST be first in resolution
 
-## Workflow Example: ELFDumper.cpp
-
-### Scenario
-- File: 8,896 lines
-- Conflict: 1 conflict in enum array (80 lines)
-- Type: Upstream deleted old CPU architecture entries
-
-### LLM Resolution Process
-
-**Step 1: Observe**
-```
-LLM calls: view_conflict("ELFDumper.cpp", 1)
-
-Response shows:
-  1138: const EnumEntry<unsigned> ElfMachineType[] = {
-  1139: <<<<<<< HEAD
-        ENUM_ENT(EM_NONE, "None"),
-        ENUM_ENT(EM_M32, "WE32100"),
-        ... (80 more ENUM_ENT lines)
-  1220: =======
-  1221: >>>>>>> heaven/main
-  1222:   ENUM_ENT(EM_OPENRISC, "OpenRISC 32-bit embedded processor"),
+  after.txt (10 lines)
+    Context after conflict - MUST be last in resolution
 ```
 
-**Step 2: Understand Context**
-```
-LLM calls: show_merge_summary()
-Response: "Merging LLVM upstream (heaven/main) into llvm-mos fork. 7 files, 12 conflicts."
+## Tool Interface
 
-LLM thinks: "This is llvm-mos, a MOS 65xx fork of LLVM. MOS-specific code is important."
-```
+Five simple, composable tools for working with the conflict workspace.
 
-**Step 3: Investigate**
-```
-LLM calls: git_show_commit("heaven/main", "ELFDumper.cpp")
-Response: "Commit abc123: Remove unused architecture types - cleanup PR"
+### list_files()
 
-LLM calls: grep_codebase("EM_MOS")
-Response: "Found in 15 files - this is a core part of llvm-mos"
+List all available files with descriptions and line counts.
 
-LLM calls: view_more_context("ELFDumper.cpp", 1, before=0, after=50)
-Response shows: None of the deleted entries are EM_MOS-related
-```
+**Parameters**: None
 
-**Step 4: Reason**
-```
-LLM reasoning:
-"Upstream cleaned up unused architectures. The deleted entries are all
-standard architectures (SPARC, M32, etc.). The MOS-specific entries are
-not in this conflict block. Safe to accept upstream's cleanup."
-```
+**Returns**: Human-readable list of files with metadata
 
-**Step 5: Execute**
+**Example**:
 ```
-LLM calls: resolve_conflict("ELFDumper.cpp", 1, choice="theirs")
+Available files in workspace:
 
-LLM explains: "Accepted upstream deletion. General architecture cleanup,
-no MOS-specific entries affected. Verified EM_MOS entries are elsewhere."
+  base.txt (2 lines)
+    Content from merge base (common ancestor)
+
+  ours.txt (2 lines)
+    Content from our branch (HEAD) - unchanged from base
+
+  theirs.txt (0 lines)
+    Content from their branch (upstream) - deleted
+
+  before.txt (10 lines)
+    Context before conflict - MUST be first in resolution
+
+  after.txt (10 lines)
+    Context after conflict - MUST be last in resolution
 ```
 
-## Workflow Example: LiveRangeEdit.h
+### read_file(name, start_line=1, end_line=None)
 
-### Scenario
-- File: 459 lines
-- Conflicts: 2 conflicts (lines 78 and 177)
-- Type: Deleted member variables and method
+Read content from a file, optionally specifying line range.
 
-### LLM Resolution Process
+**Parameters**:
+- name: Filename to read
+- start_line: First line to read (default: 1)
+- end_line: Last line to read (default: all lines, max 20 unless specified)
 
-**Step 1: Observe Both Conflicts**
+**Returns**: File content with line numbers
+
+**Example**:
 ```
-LLM calls: view_conflict("LiveRangeEdit.h", 1)
-Shows: EnableRemat and ScannedRemattable member variables deleted
-
-LLM calls: view_conflict("LiveRangeEdit.h", 2)
-Shows: Some method deleted
-```
-
-**Step 2: Investigate Relationship**
-```
-LLM calls: grep_in_file("LiveRangeEdit.h", "EnableRemat")
-Response: "Only appears in conflict block"
-
-LLM calls: grep_codebase("EnableRemat")
-Response: "Found in LiveRangeEdit.cpp - the implementation file"
-
-LLM calls: git_log("LiveRangeEdit.h", max_count=5)
-Response shows: "Refactoring: moved rematerialization logic to separate class"
+read_file("ours.txt")
+→
+  1: bool EnableRemat = true;
+  2: bool ScannedRemattable = false;
 ```
 
-**Step 3: Reason**
+**Example with range**:
 ```
-LLM reasoning:
-"Both conflicts are part of same refactoring. Upstream moved
-rematerialization logic elsewhere. Related member variables and
-methods should be deleted together. This is a coordinated change."
-```
-
-**Step 4: Execute**
-```
-LLM calls: resolve_conflict("LiveRangeEdit.h", 1, choice="theirs")
-LLM calls: resolve_conflict("LiveRangeEdit.h", 2, choice="theirs")
-
-LLM explains: "Accepted both deletions. Part of upstream refactoring
-that moved rematerialization logic to separate class. Coordinated change."
+read_file("before.txt", 1, 5)
+→
+  1: MachineRegisterInfo &MRI;
+  2: LiveIntervals &LIS;
+  3: VirtRegMap *VRM;
+  4: const TargetInstrInfo &TII;
+  5: Delegate *const TheDelegate;
 ```
 
-## Design Principles
+### write_file(name, content, description="")
 
-### 1. Context-First
+Create a new file in the workspace.
 
-Every tool returns human-readable text with natural context, not just data.
+**Parameters**:
+- name: Filename to create
+- content: File content
+- description: Optional description of file purpose (shown in list_files)
 
-**Good:**
+**Returns**: Confirmation with line count
+
+**Example**:
 ```
-Function foo() at line 120:
-  void foo() {
-    int x = 5;  // <-- Definition
-    return x;
-  }
+write_file("merged.txt",
+           "// Combined logic from both branches\nif (x && y) { ... }",
+           "Custom merge combining safety checks from both sides")
+→ Created merged.txt (2 lines)
 ```
 
-**Bad:**
+### cat_files(input_files, output_file)
+
+Concatenate multiple files into a single output file.
+
+**Parameters**:
+- input_files: List of filenames to concatenate (in order)
+- output_file: Name of output file to create
+
+**Returns**: Confirmation with total line count
+
+**Example**:
 ```
-{"function": "foo", "line": 120, "type": "void"}
+cat_files(["before.txt", "theirs.txt", "after.txt"], "resolution.txt")
+→ Created resolution.txt (20 lines) from 3 files
 ```
 
-### 2. Progressive Enhancement
+### submit_resolution(filename)
 
-Tools build on each other. Core tools work standalone, advanced tools add capability.
+Submit the final resolution, applying it to the actual conflicted file.
 
-- Layer 1 works without anything else
-- Layer 2 adds git understanding
-- Layer 3 adds codebase search
-- Layer 4 adds LSP (when available)
-- Layer 5 adds external context (when available)
+**Parameters**:
+- filename: Name of file containing resolution
 
-### 3. Graceful Degradation
+**Returns**: Success confirmation or validation error
 
-If advanced tools unavailable, basic tools still work.
+**Validation**:
+- File must exist in workspace
+- Must start with before.txt content
+- Must end with after.txt content
 
-- No clangd? Use grep instead
-- No MCP? Use local tools
-- No human available? Log questions and proceed
+**Example**:
+```
+submit_resolution("resolution.txt")
+→ Resolution applied successfully. File staged with git.
+```
 
-### 4. LLM-Friendly
+## Additional Investigation Tools
 
-Design for how LLMs actually think:
-- Show context (10 lines around conflicts)
-- Natural language descriptions
-- Simple choices: ours/theirs/both
-- Allow questions and exploration
+The file-based workspace tools work alongside existing investigation tools.
 
-### 5. Observable
+### Git Investigation (Layer 2)
 
-All LLM actions are logged:
-- What tools it used
-- What it discovered
-- How it reasoned
-- What it decided
-- Why it decided that way
+- **git_show_commit(ref, file)**: View commit message and changes
+- **git_log(file, max_count)**: View recent commit history
+- **show_merge_summary()**: Overview of entire merge operation
+- **list_all_conflicts()**: List all conflict hunks in merge
 
-## Implementation Phases
+### Codebase Search (Layer 3)
 
-### Phase 1: Core Tools (MVP)
-- Implement Layer 1 (view_conflict, resolve_conflict)
-- Update main.py to use tool-based resolver
-- Test with real conflicts
+- **grep_codebase(pattern, file_pattern, context)**: Search across repository
+- **grep_in_file(file, pattern, context)**: Search within specific file
 
-### Phase 2: Investigation
-- Add Layer 2 (git_show_commit, git_log, merge summary)
-- Test with conflicts requiring context
+### Language Server (Layer 4 - Future)
 
-### Phase 3: Codebase Search
-- Add Layer 3 (grep_codebase, find_definition)
-- Test with refactoring conflicts
+- **query_language_server(file, line, query_type)**: Semantic queries
+- **get_type_info(file, symbol)**: Type information
+- **check_syntax(file)**: Verify file compiles
 
-### Phase 4: Language Server
-- Add Layer 4 (LSP integration)
-- Requires clangd or similar LSP server running
-- Optional, graceful degradation
+These investigation tools help the LLM understand intent before composing the resolution.
 
-### Phase 5: Extended Context
-- Add Layer 5 (MCP integration, human questions)
-- Build on MCP tools if available
+## LLM Workflow
 
-## Configuration
+The LLM follows a natural workflow using file-based tools.
+
+### Step 1: Understand the Conflict
+
+```
+LLM: list_files()
+
+Available files in workspace:
+
+  base.txt (2 lines)
+    Content from merge base (common ancestor)
+
+  ours.txt (2 lines)
+    Content from our branch (HEAD)
+
+  theirs.txt (0 lines)
+    Content from their branch (upstream) - deleted
+
+  before.txt (10 lines)
+    Context before conflict - MUST be first in resolution
+
+  after.txt (10 lines)
+    Context after conflict - MUST be last in resolution
+```
+
+### Step 2: Examine Each Version
+
+```
+LLM: read_file("base.txt")
+→
+  1: bool EnableRemat = true;
+  2: bool ScannedRemattable = false;
+
+LLM: read_file("ours.txt")
+→
+  1: bool EnableRemat = true;
+  2: bool ScannedRemattable = false;
+
+LLM: read_file("theirs.txt")
+→ (empty - 0 lines)
+```
+
+**Analysis**: BASE→OURS shows no change. BASE→THEIRS shows deletion.
+
+### Step 3: Investigate Intent
+
+```
+LLM: git_log("LiveRangeEdit.h", 5)
+→ Recent commits show: "Refactor: Move rematerialization logic to separate class"
+
+LLM: grep_codebase("EnableRemat")
+→ Found in LiveRangeEdit.cpp but checking if still used...
+
+LLM: git_show_commit("upstream/main", "LiveRangeEdit.h")
+→ Commit message confirms: "Extracted rematerialization to RematerializationAnalyzer class"
+```
+
+### Step 4: Compose Resolution
+
+For simple case (accept deletion):
+```
+LLM: cat_files(["before.txt", "after.txt"], "resolution.txt")
+→ Created resolution.txt (20 lines) from 2 files
+```
+
+For complex case (custom merge):
+```
+LLM: write_file("merged.txt",
+                "// Keeping partial functionality\nbool EnableRemat = true;",
+                "Partial merge - keep EnableRemat but not ScannedRemattable")
+
+LLM: cat_files(["before.txt", "merged.txt", "after.txt"], "resolution.txt")
+→ Created resolution.txt (21 lines) from 3 files
+```
+
+### Step 5: Submit Resolution
+
+```
+LLM: submit_resolution("resolution.txt")
+→ Resolution applied successfully. File staged with git.
+```
+
+## Prompt Engineering
+
+The LLM prompt guides the file-based workflow.
+
+### Initial Prompt Template
+
+```
+You are resolving a merge conflict in {file_path}.
+
+CONFLICT CONTEXT:
+  Commit pair: ({i1}, {i2})
+  Our commit: {commit_ours_message}
+  Their commit: {commit_theirs_message}
+
+WORKSPACE:
+A workspace has been created with files representing this conflict.
+Use list_files() to see available files.
+
+PROCESS:
+1. List files to see what's available
+2. Read base.txt, ours.txt, theirs.txt to understand changes
+3. Investigate using git_log, grep_codebase if needed
+4. Create your resolution by composing files
+5. Submit your resolution
+
+RESOLUTION REQUIREMENTS:
+- Must start with before.txt content
+- Must end with after.txt content
+- Middle section is your choice of base/ours/theirs/custom
+
+COMMON PATTERNS:
+
+Accept theirs (deletion):
+  cat_files(["before.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Accept theirs (changed content):
+  cat_files(["before.txt", "theirs.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Accept ours:
+  cat_files(["before.txt", "ours.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Accept both (if compatible):
+  cat_files(["before.txt", "ours.txt", "theirs.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Custom merge:
+  write_file("merged.txt", "your custom content", "description")
+  cat_files(["before.txt", "merged.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+AVAILABLE TOOLS:
+File operations: list_files, read_file, write_file, cat_files, submit_resolution
+Investigation: git_log, git_show_commit, grep_codebase, grep_in_file
+Context: show_merge_summary, list_all_conflicts
+
+Begin by listing files to see the conflict.
+```
+
+### Chain-of-Thought Guidance
+
+```
+Think step-by-step:
+
+1. EXAMINE FILES
+   - What's in base.txt, ours.txt, theirs.txt?
+   - What changed: BASE→OURS? BASE→THEIRS?
+   - Are changes related or independent?
+
+2. UNDERSTAND INTENT
+   - Why did we make our changes?
+   - Why did they make their changes?
+   - Check git_log and commit messages
+
+3. INVESTIGATE IF NEEDED
+   - Is deleted code used elsewhere? (grep_codebase)
+   - What's the broader context? (read_file on before/after)
+   - Are there related changes? (git_show_commit)
+
+4. COMPOSE RESOLUTION
+   - Choose: ours, theirs, both, or custom?
+   - Create intermediate files if needed
+   - Concatenate in correct order: before + content + after
+
+5. SUBMIT
+   - Validate resolution makes sense
+   - Submit with confidence score and reasoning
+```
+
+### Few-Shot Examples
+
+Examples showing the file-based workflow:
+
+**Example 1: Simple Deletion**
+```
+Conflict: Upstream deleted member variables
+
+list_files() shows theirs.txt is empty (0 lines)
+
+read_file("base.txt") → two member variables
+read_file("ours.txt") → same two variables (unchanged)
+read_file("theirs.txt") → empty (deleted)
+
+Investigation:
+  git_log shows "Refactored to separate class"
+  grep_codebase confirms not used elsewhere
+
+Resolution:
+  cat_files(["before.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Reasoning: Safe to accept deletion as part of refactoring
+```
+
+**Example 2: Logic Merge**
+```
+Conflict: Both sides added different safety checks
+
+read_file("base.txt") → if user.active: login()
+read_file("ours.txt") → if user.active and not blocked: login()
+read_file("theirs.txt") → if user.active and not rate_limited: login()
+
+Analysis: Both added independent safety checks
+
+Resolution:
+  write_file("merged.txt",
+             "if user.active and not blocked and not rate_limited: login()",
+             "Combined both safety checks")
+  cat_files(["before.txt", "merged.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Reasoning: Both checks are needed for security
+```
+
+**Example 3: Uncertain Case**
+```
+Conflict: Complex algorithm change
+
+read_file("theirs.txt") shows significant algorithm rewrite
+
+Investigation:
+  git_show_commit → "Optimize for performance"
+  grep_codebase → algorithm used in MOS-specific code
+
+Analysis: Cannot determine if optimization is compatible with MOS target
+
+Resolution:
+  write_file("analysis.txt",
+             "THEIRS rewrote algorithm but unclear if MOS-compatible",
+             "Analysis notes - flagging for human review")
+
+  cat_files(["before.txt", "ours.txt", "after.txt"], "resolution.txt")
+  submit_resolution("resolution.txt")
+
+Reasoning: Keeping ours (safe), but flagging for human review
+Confidence: 0.6
+Needs human review: true
+```
+
+## Resolution Decision Format
+
+The LLM outputs a decision in YAML format (in markdown code block).
+
+### Decision Schema
 
 ```yaml
-resolver:
-  # Context size for viewing conflicts
-  default_context_lines: 10
-  max_context_lines: 100
+action: accept_ours | accept_theirs | accept_both | custom
+reasoning: |
+  Clear explanation of the decision.
+  Multiple lines allowed.
+confidence: 0.85
+needs_human_review: false
+files_used:
+  - base.txt
+  - ours.txt
+  - theirs.txt
+  - resolution.txt
+intermediate_files:
+  - analysis.txt: "Notes on why this was tricky"
+```
 
-  # Tool availability
-  enable_git_tools: true
-  enable_grep_tools: true
-  enable_language_server: false  # Requires LSP setup
+### Why YAML in Markdown
 
-  # Interactive mode
-  allow_human_questions: false  # Set true for interactive
+LLMs handle YAML better than JSON:
+- Indentation-based (like Python)
+- Multi-line strings are natural with `|`
+- Fewer syntax errors
+- More readable in prompts
 
-  # Logging
-  log_tool_usage: true
-  log_llm_reasoning: true
+### Parsing Strategy
+
+Extract YAML block from LLM response:
+
+```python
+import re
+import yaml
+
+def extract_decision(llm_response: str) -> dict:
+    """Extract YAML decision from LLM response."""
+    match = re.search(r'```yaml\n(.*?)\n```', llm_response, re.DOTALL)
+    if not match:
+        raise ValueError("No YAML decision found in response")
+
+    yaml_text = match.group(1)
+    return yaml.safe_load(yaml_text)
+```
+
+## Implementation
+
+### Workspace Creation
+
+```python
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass
+class FileMetadata:
+    """Metadata for a workspace file."""
+    content: str
+    description: str
+    required_in_resolution: bool = False
+
+    @property
+    def line_count(self) -> int:
+        return len(self.content.splitlines()) if self.content else 0
+
+class ConflictWorkspace:
+    """Workspace containing files for one conflict hunk."""
+
+    def __init__(self, conflict_hunk: ConflictHunk, workspace_id: str):
+        """Initialize workspace from conflict hunk.
+
+        Args:
+            conflict_hunk: Parsed conflict data
+            workspace_id: Unique identifier for workspace directory
+        """
+        self.workdir = Path("/tmp") / f"conflict_{workspace_id}"
+        self.workdir.mkdir(parents=True, exist_ok=True)
+
+        # Create file metadata
+        self.files = {
+            "base.txt": FileMetadata(
+                content=conflict_hunk.base_content,
+                description="Content from merge base (common ancestor)",
+                required_in_resolution=False,
+            ),
+            "ours.txt": FileMetadata(
+                content=conflict_hunk.ours_content,
+                description=f"Content from our branch ({conflict_hunk.ours_ref})",
+                required_in_resolution=False,
+            ),
+            "theirs.txt": FileMetadata(
+                content=conflict_hunk.theirs_content,
+                description=f"Content from their branch ({conflict_hunk.theirs_ref})",
+                required_in_resolution=False,
+            ),
+            "before.txt": FileMetadata(
+                content="\n".join(conflict_hunk.context_before),
+                description="Context before conflict - MUST be first in resolution",
+                required_in_resolution=True,
+            ),
+            "after.txt": FileMetadata(
+                content="\n".join(conflict_hunk.context_after),
+                description="Context after conflict - MUST be last in resolution",
+                required_in_resolution=True,
+            ),
+        }
+
+        # Write all initial files
+        for filename, meta in self.files.items():
+            self._write_to_disk(filename, meta.content)
+
+    def _write_to_disk(self, filename: str, content: str):
+        """Write file to workspace directory."""
+        (self.workdir / filename).write_text(content)
+```
+
+### Tool Implementation
+
+```python
+class WorkspaceTools:
+    """Tools for working with conflict workspace."""
+
+    def __init__(self, workspace: ConflictWorkspace):
+        self.workspace = workspace
+
+    def list_files(self) -> str:
+        """List all files with descriptions."""
+        lines = ["Available files in workspace:\n"]
+
+        for filename, meta in self.workspace.files.items():
+            lines.append(f"  {filename} ({meta.line_count} lines)")
+            lines.append(f"    {meta.description}\n")
+
+        return "\n".join(lines)
+
+    def read_file(self, name: str, start_line: int = 1,
+                  end_line: int | None = None) -> str:
+        """Read file content with line numbers."""
+        if name not in self.workspace.files:
+            return f"Error: File '{name}' not found. Use list_files() to see available files."
+
+        content = self.workspace.files[name].content
+        lines = content.splitlines()
+
+        # Default to showing first 20 lines if no end specified
+        if end_line is None:
+            end_line = min(len(lines), 20)
+
+        # Extract range (1-indexed)
+        selected_lines = lines[start_line - 1:end_line]
+
+        # Format with line numbers
+        output = []
+        for i, line in enumerate(selected_lines, start=start_line):
+            output.append(f"  {i}: {line}")
+
+        return "\n".join(output)
+
+    def write_file(self, name: str, content: str,
+                   description: str = "") -> str:
+        """Create new file in workspace."""
+        self.workspace.files[name] = FileMetadata(
+            content=content,
+            description=description or "User-created file",
+            required_in_resolution=False,
+        )
+        self.workspace._write_to_disk(name, content)
+
+        line_count = len(content.splitlines())
+        return f"Created {name} ({line_count} lines)"
+
+    def cat_files(self, input_files: list[str], output_file: str) -> str:
+        """Concatenate files into output."""
+        # Validate all input files exist
+        for filename in input_files:
+            if filename not in self.workspace.files:
+                return f"Error: File '{filename}' not found"
+
+        # Concatenate
+        parts = [self.workspace.files[f].content for f in input_files]
+        concatenated = "\n".join(parts)
+
+        # Create output file
+        self.workspace.files[output_file] = FileMetadata(
+            content=concatenated,
+            description=f"Concatenation of {len(input_files)} files",
+            required_in_resolution=False,
+        )
+        self.workspace._write_to_disk(output_file, concatenated)
+
+        line_count = len(concatenated.splitlines())
+        return f"Created {output_file} ({line_count} lines) from {len(input_files)} files"
+
+    def submit_resolution(self, filename: str) -> str:
+        """Submit resolution file."""
+        if filename not in self.workspace.files:
+            return f"Error: File '{filename}' not found"
+
+        resolution = self.workspace.files[filename].content
+        before = self.workspace.files["before.txt"].content
+        after = self.workspace.files["after.txt"].content
+
+        # Validate structure
+        if not resolution.startswith(before):
+            return "Error: Resolution must start with before.txt content"
+
+        if not resolution.endswith(after):
+            return "Error: Resolution must end with after.txt content"
+
+        # Apply resolution (implementation in resolve_conflicts node)
+        return f"Resolution accepted from {filename}. Ready to apply."
+```
+
+### LangGraph Integration
+
+The file-based tools integrate into the resolution subgraph:
+
+```python
+def create_resolution_subgraph():
+    """Create resolution subgraph with file-based tools."""
+
+    # Initialize workspace (done in present_conflict node)
+    def present_conflict(state):
+        workspace = ConflictWorkspace(state.current_hunk, workspace_id=...)
+        tools = WorkspaceTools(workspace)
+
+        # Add initial message with prompt
+        prompt = create_file_based_prompt(workspace, state)
+        state.messages = [HumanMessage(content=prompt)]
+        state.workspace = workspace
+        state.tools = tools
+        return state
+
+    # LLM decides (with file tools)
+    def llm_decide(state):
+        llm = ChatOpenAI(...).bind_tools([
+            state.tools.list_files,
+            state.tools.read_file,
+            state.tools.write_file,
+            state.tools.cat_files,
+            state.tools.submit_resolution,
+            # Plus investigation tools
+            git_log_tool,
+            grep_codebase_tool,
+            ...
+        ])
+
+        response = llm.invoke(state.messages)
+        state.messages.append(response)
+        return state
+
+    # Extract resolution (when submit_resolution called)
+    def extract_resolution(state):
+        # Find submit_resolution tool call
+        last_msg = state.messages[-1]
+        for tool_call in last_msg.tool_calls:
+            if tool_call["name"] == "submit_resolution":
+                filename = tool_call["args"]["filename"]
+                resolution_content = state.workspace.files[filename].content
+
+                # Extract YAML decision from messages
+                decision = extract_decision_from_messages(state.messages)
+
+                state.resolution = Resolution(
+                    content=resolution_content,
+                    decision=decision,
+                )
+                return state
 ```
 
 ## Benefits
 
 ### Compared to "Regenerate Entire File" Approach
 
-**Cost:**
+**Cost**:
 - Old: ~10,000 tokens per large file
-- New: ~500 tokens per conflict (20x cheaper)
+- New: ~200-500 tokens per conflict (20-50x cheaper)
 
-**Accuracy:**
+**Accuracy**:
 - Old: LLM can make typos anywhere in 8,896 lines
-- New: LLM only edits specific conflict blocks
+- New: LLM only composes small sections
 
-**Speed:**
+**Speed**:
 - Old: 30+ seconds to regenerate large file
 - New: 3-5 seconds per conflict resolution
 
-**Observability:**
+**Observability**:
 - Old: Black box - don't know why LLM decided something
-- New: Full log of investigation and reasoning
+- New: Full workspace with intermediate files shows thought process
 
-**Extensibility:**
-- Old: Hard to add new capabilities
-- New: Just add new tools to registry
+**Debuggability**:
+- Old: Must re-run to see what happened
+- New: Workspace files persist in /tmp for inspection
+
+### Compared to Abstract Tool Approach
+
+**Simplicity**:
+- Old: Complex layered tools (view_conflict, resolve_conflict, view_more_context...)
+- New: Five simple file operations (list, read, write, cat, submit)
+
+**Flexibility**:
+- Old: Fixed resolution actions (ours/theirs/both/custom)
+- New: Arbitrary composition via file operations
+
+**LLM-Friendly**:
+- Old: Abstract conflict IDs and resolution parameters
+- New: Concrete files with clear names and descriptions
+
+**Composability**:
+- Old: One-shot resolution via tool call
+- New: Build resolution incrementally, create intermediate artifacts
+
+## Design Principles
+
+### 1. Files as Primary Interface
+
+Everything is a file:
+- Conflict sections (base.txt, ours.txt, theirs.txt)
+- Context (before.txt, after.txt)
+- Intermediate work (analysis.txt, merged.txt)
+- Final resolution (resolution.txt)
+
+Files are concrete, debuggable, and familiar to LLMs.
+
+### 2. Composition via Concatenation
+
+Resolution is built by concatenating files:
+- Simple cases: `cat before.txt theirs.txt after.txt`
+- Complex cases: Create intermediate files, then concatenate
+
+This is the Unix way - simple tools, powerful combinations.
+
+### 3. Self-Documenting Workspace
+
+Every file has a description shown by list_files():
+- LLM always knows what each file represents
+- Required files are clearly marked
+- User-created files get descriptions too
+
+No need to remember abstract IDs or parameters.
+
+### 4. Progressive Enhancement
+
+Core tools (list, read, write, cat, submit) work standalone.
+Investigation tools (git, grep) add capability.
+Future tools (LSP) add semantic understanding.
+
+System works in minimal environment, improves with more tools.
+
+### 5. Explicit Intermediate Artifacts
+
+LLM can create analysis files, notes, partial merges:
+- Thought process is visible
+- Debugging is easier
+- Can inspect workspace after completion
+
+Transparency by design.
+
+### 6. Validation at Boundaries
+
+Tools validate at submit time:
+- Resolution must include required files
+- Structure is checked (before → content → after)
+- Clear error messages guide LLM
+
+But LLM has freedom to compose however it wants.
 
 ## Future Enhancements
 
-### Smart Conflict Detection
-- Detect conflict patterns (enum lists, import statements, etc.)
-- Suggest automatic resolution strategies
-- "This looks like a list merge - want me to merge both sides?"
+### Workspace Templates
 
-### Learning from History
-- Track which resolutions worked (passed tests)
-- Learn patterns: "MOS-specific code should usually be kept"
-- Suggest resolutions based on similar past conflicts
+Pre-populate workspace with common patterns:
 
-### Parallel Resolution
-- Resolve independent conflicts in parallel
-- Use multiple LLM calls concurrently for speed
+```
+/tmp/conflict_xyz/
+  base.txt, ours.txt, theirs.txt, before.txt, after.txt
 
-### Test-Driven Resolution
-- Run tests after each resolution
-- Automatically revert if tests fail
-- Iteratively refine until tests pass
+  templates/
+    accept_ours.txt - Pre-concatenated version accepting ours
+    accept_theirs.txt - Pre-concatenated version accepting theirs
+    accept_both.txt - Pre-concatenated version with both
+```
+
+LLM can read templates as starting points.
+
+### Diff Visualization
+
+Add tool to show diffs between files:
+
+```
+diff_files("base.txt", "theirs.txt")
+→
+  1: bool EnableRemat = true;
+  2: bool ScannedRemattable = false;
+
+  1: (deleted)
+  2: (deleted)
+```
+
+### Semantic Annotations
+
+Enrich files with semantic comments from commit analysis:
+
+```
+# THEIRS: Deleted as part of refactoring to RematerializationAnalyzer
+# See commit abc123: "Extract rematerialization logic"
+<<<<<<< HEAD
+...
+```
+
+### Multi-File Conflicts
+
+For conflicts spanning multiple related files, create cross-file workspace:
+
+```
+/tmp/conflict_xyz/
+  file1/
+    base.txt, ours.txt, theirs.txt, before.txt, after.txt
+  file2/
+    base.txt, ours.txt, theirs.txt, before.txt, after.txt
+
+  cross_file_analysis.txt
+```
+
+### Pattern Learning
+
+Track which composition patterns worked:
+- File combinations that passed tests
+- Successful custom merges
+- Common investigation sequences
+
+Use to suggest patterns in future conflicts.
 
 ## References
 
-- Inspiration: merde.ai - LLM-based merge tool with clipboard/editor metaphor
-- LangChain tool/function calling documentation
-- LLVM merge examples from llvm-mos project
+- Unix philosophy: Small tools, composition, files as interface
+- git-imerge: Incremental merge subdivision
+- LangChain tool calling: Agent with tools pattern
+- Gmerge (Microsoft 2022): Research on merge conflict presentation
+- llvm-mos project: Real-world merge examples
