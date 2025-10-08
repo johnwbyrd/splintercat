@@ -2,22 +2,82 @@
 
 Implementation order for MVP, organized by phases. This guide assumes the tool-based conflict resolution architecture from merge-resolver.md.
 
+## Architecture Overview
+
+The implementation follows a component-by-variation design where functionality is organized by type:
+
+**Current Architecture (as implemented):**
+- **main.py**: Minimal entry point - creates SplintercatApp and runs it (IMPLEMENTED)
+- **src/app.py**: SplintercatApp orchestrates the workflow using LangGraph (IMPLEMENTED)
+- **src/workflow/graph.py**: Complete graph definition with all nodes and routing logic (IMPLEMENTED)
+- **src/strategy/**: Strategy classes control resolution batching (IMPLEMENTED)
+  - base.py: Strategy protocol
+  - optimistic.py, batch.py, per_conflict.py: Concrete implementations with working logic
+- **src/recovery/**: Recovery classes handle build/test failures (IMPLEMENTED)
+  - base.py: Recovery protocol
+  - retry_all.py, retry_specific.py, bisect.py, switch_strategy.py: Concrete implementations with working logic
+- **src/tools/**: Tool system for LLM function calling (SKELETON - needs implementation)
+  - base.py, registry.py: Infrastructure (IMPLEMENTED)
+  - conflict.py, git.py, search.py, merge.py: Tool implementations (SKELETON - execute() methods return stubs)
+
+**Key Architectural Principle:**
+Nodes are simple coordinators that USE strategy/recovery classes. They don't contain the logic themselves - they delegate to the appropriate class based on state/decisions.
+
+## Current Status Summary
+
+**What's IMPLEMENTED:**
+- main.py and src/app.py (application structure)
+- src/workflow/graph.py (complete graph with routing)
+- src/strategy/ (all strategy classes with working logic)
+- src/recovery/ (all recovery classes with working logic)
+- src/tools/base.py and registry.py (tool infrastructure)
+- src/core/config.py (configuration system)
+- src/core/log.py (logging)
+- src/core/result.py (Result class)
+- src/core/command_runner.py (CommandRunner)
+
+**What's SKELETON (structure exists, needs implementation logic):**
+- Core components: IMergeWrapper, BuildRunner, TestRunner (SKELETON - all methods are pass)
+- Model components: Resolver, Summarizer, Planner (SKELETON - all methods are pass)
+- Tool implementations: conflict.py, git.py, search.py, merge.py (SKELETON - execute() returns "implementation pending")
+- Node implementations: All nodes in src/workflow/nodes/ (SKELETON - all functions are pass)
+- State models: src/state/ (may be incomplete)
+
+**Implementation Strategy:**
+1. Build foundational components (Phase 1: git-imerge, build/test runners)
+2. Implement tool system and resolver (Phase 2)
+3. Implement nodes to use strategies (Phase 3)
+4. Add failure handling (Phase 4: summarizer)
+5. Add recovery and planning (Phase 5: planner, execute_recovery using recovery classes)
+6. Complete node implementations (Phase 6)
+7. Add investigation tools (Phase 7)
+8. Polish and test (Phase 8)
+
 ## Phase 1: Core Infrastructure
 
 Goal: Get basic plumbing working independently with git-imerge
 
-### 1. Update config.py - DONE
+### 1. Update config.py - IMPLEMENTED
 
 Configuration classes are implemented:
 - ModelConfig (api_key, base_url, resolver_model, summarizer_model, planner_model)
-- BuildConfig (command, output_dir, timeout) - for fast incremental builds to detect compile errors
-- TestConfig (command, output_dir, timeout) - for complete test runs to validate correctness
+- BuildTestConfig (command, output_dir, timeout) - unified build and test config
 - IMergeConfig (name, goal)
 - Settings with template substitution for {target.workdir}
 
-### 2. Implement git-imerge wrapper (src/git/imerge.py)
+### 1a. Application Structure - IMPLEMENTED
 
-Full implementation, not a stub. This is foundational for the entire system.
+Core application architecture is in place:
+- main.py: Minimal entry point that creates SplintercatApp and runs it
+- src/app.py: SplintercatApp orchestrates the workflow using LangGraph
+- Workflow creation delegated to src/workflow/graph.py
+- Clean separation: main.py → SplintercatApp → create_workflow()
+
+### 2. Implement git-imerge wrapper (src/git/imerge.py) - SKELETON
+
+**Status:** SKELETON - File exists, all methods are pass statements
+
+Full implementation needed. This is foundational for the entire system.
 
 **Core Methods:**
 
@@ -69,15 +129,17 @@ finalize() -> str
 **Key Insight:**
 git-imerge maintains state in refs/imerge/{name}/ and uses a scratch branch at refs/heads/imerge/{name}. We must respect this workflow: start → [conflict → resolve → stage → continue] → finish.
 
-### 3. Implement BuildRunner (src/runner/build.py)
+### 3. Implement BuildRunner (src/runner/build.py) - SKELETON
 
-Execute build commands with proper logging and timeout handling for fast incremental builds.
+**Status:** SKELETON - File exists, all methods are pass statements
+
+Execute build and test commands with proper logging and timeout handling.
 
 **Core Method:**
 
-run_build(command: str) -> BuildResult
+run_build_test(command: str) -> BuildResult
 - Create output_dir if it doesn't exist
-- Generate timestamped log filename: build-{YYYYMMDD-HHMMSS}.log
+- Generate timestamped log filename: build-test-{YYYYMMDD-HHMMSS}.log
 - Execute command in workdir with timeout
 - Stream output to both console (INFO level) and log file
 - Handle timeout gracefully (kill process, mark as timeout failure)
@@ -92,7 +154,7 @@ run_build(command: str) -> BuildResult
 **Implementation Details:**
 - Use CommandRunner for execution with real-time output
 - Write all stdout/stderr to log file as execution happens
-- On timeout: log "Build timed out after {timeout} seconds" and kill process
+- On timeout: log "Build/test timed out after {timeout} seconds" and kill process
 - Ensure log file is flushed and closed even on errors
 - Log file naming must be consistent for Summarizer to find them
 
@@ -109,46 +171,7 @@ run_build(command: str) -> BuildResult
 - Test with command that writes to stderr - should capture both streams
 - Verify log files are written to correct location with correct naming
 
-### 4. Implement TestRunner (src/runner/test.py)
-
-Execute test commands with proper logging and timeout handling for complete test validation.
-
-**Core Method:**
-
-run_test(command: str) -> TestResult
-- Create output_dir if it doesn't exist
-- Generate timestamped log filename: test-{YYYYMMDD-HHMMSS}.log
-- Execute command in workdir with timeout
-- Stream output to both console (INFO level) and log file
-- Handle timeout gracefully (kill process, mark as timeout failure)
-- Return TestResult(success, log_file, returncode, timestamp)
-
-**TestResult Model (src/state/test.py):**
-- success: bool
-- log_file: Path
-- returncode: int
-- timestamp: datetime
-
-**Implementation Details:**
-- Use CommandRunner for execution with real-time output
-- Write all stdout/stderr to log file as execution happens
-- On timeout: log "Test timed out after {timeout} seconds" and kill process
-- Ensure log file is flushed and closed even on errors
-- Log file naming must be consistent for Summarizer to find them
-
-**Error Handling:**
-- Timeout: SIGTERM then SIGKILL if needed
-- Command not found: clear error message
-- Working directory doesn't exist: check before running
-- Disk full: catch and report
-
-**Testing Strategy:**
-- Test with ninja check-llvm (or subset) and verify log captured
-- Test timeout with sleep command
-- Test failure capture with command that exits non-zero
-- Verify log file permissions and location
-
-### 5. Test infrastructure independently
+### 4. Test infrastructure independently
 
 Before combining components, verify each works in isolation.
 
@@ -160,15 +183,9 @@ Before combining components, verify each works in isolation.
 - Verify final merge commit has two parents and correct tree
 
 **BuildRunner tests:**
-- Run fast incremental build (single file) and verify log captured
+- Run fast build command and verify log captured
 - Test timeout with sleep command
 - Test failure capture with command that exits non-zero
-- Verify log file permissions and location
-
-**TestRunner tests:**
-- Run ninja check-llvm (or subset) and verify log captured
-- Test timeout with long-running test
-- Test failure capture with failing test
 - Verify log file permissions and location
 
 **Config tests:**
@@ -179,19 +196,20 @@ Before combining components, verify each works in isolation.
 
 **Success Criteria:**
 - git-imerge can start, detect conflicts, continue, and finalize
-- BuildRunner captures output and handles timeouts for fast builds
-- TestRunner captures output and handles timeouts for full test runs
+- BuildRunner captures output and handles timeouts
 - Config loads from all sources (YAML, .env, CLI)
 
 ## Phase 2: Tool-Based Resolver
 
 Goal: Get conflict resolution working with tool-based architecture
 
-### 6. Implement tool system (src/tools/)
+### 5. Implement tool system (src/tools/) - SKELETON
+
+**Status:** Infrastructure IMPLEMENTED, tool logic SKELETON
 
 Create infrastructure for LLM to use tools via function calling.
 
-**Base Tool Class (src/tools/base.py):**
+**Base Tool Class (src/tools/base.py) - IMPLEMENTED:**
 
 Tool protocol with:
 - name: str - tool identifier for LLM
@@ -199,7 +217,7 @@ Tool protocol with:
 - parameters: dict - JSON schema of parameters
 - execute(**kwargs) -> str - runs tool, returns human-readable result
 
-**Tool Registry (src/tools/registry.py):**
+**Tool Registry (src/tools/registry.py) - IMPLEMENTED:**
 
 ToolRegistry class:
 - register(tool: Tool) - add tool to registry
@@ -207,7 +225,7 @@ ToolRegistry class:
 - get_schemas() -> list[dict] - return LangChain function schemas for all tools
 - execute_tool(name: str, **kwargs) -> str - execute tool by name
 
-**Layer 1 Tools (src/tools/conflict.py):**
+**Layer 1 Tools (src/tools/conflict.py) - SKELETON - needs implementation:**
 
 ViewConflictTool:
 - Parameters: file (str), conflict_num (int), context_lines (int, default=10)
@@ -284,7 +302,9 @@ ResolveConflictTool output format:
 - Verify git staging works
 - Test error cases (missing file, invalid conflict_num, etc.)
 
-### 7. Implement Resolver with function calling (src/model/resolver.py)
+### 6. Implement Resolver with function calling (src/model/resolver.py) - SKELETON
+
+**Status:** SKELETON - File exists, all methods are pass statements
 
 LLM-based resolver that uses tools to investigate and resolve conflicts.
 
@@ -392,15 +412,23 @@ Use LangChain's standard tool calling pattern:
 - Resolution is staged with git add
 - Conversation completes within reasonable turns (typically 2-4)
 
-## Phase 3: Simple Linear Flow
+## Phase 3: Strategy-Based Resolution
 
-Goal: End-to-end merge with per-conflict strategy using git-imerge
+Goal: End-to-end merge using strategy classes to control resolution flow
 
-### 8. Implement workflow nodes (simple versions)
+### 7. Implement workflow nodes using strategy classes - SKELETON
 
-These are standalone functions, not yet connected via LangGraph. Each takes state dict and returns updated state dict.
+**Status:** All node files exist with pass statements, need implementation
 
-**Initialize Node (src/workflow/nodes/initialize.py):**
+Workflow nodes coordinate components. **Strategies already exist in src/strategy/ - nodes USE them, don't reimplement.**
+
+**Strategy Classes - IMPLEMENTED (src/strategy/):**
+- base.py: Strategy protocol with should_build_now() and reset_batch()
+- optimistic.py: Resolve all conflicts before building/testing (returns False)
+- batch.py: Resolve N conflicts, then build/test (checks count >= batch_size)
+- per_conflict.py: Resolve one conflict, then build/test (checks count >= 1)
+
+**Initialize Node (src/workflow/nodes/initialize.py) - SKELETON:**
 
 initialize(state: dict) -> dict
 - Get source_ref, target_branch from state
@@ -414,10 +442,13 @@ initialize(state: dict) -> dict
 - Log: "Initialized git-imerge merge of {source_ref} into {target_branch}"
 - Return updated state
 
-**Resolve Conflicts Node (src/workflow/nodes/resolve_conflicts.py):**
+**Resolve Conflicts Node (src/workflow/nodes/resolve_conflicts.py) - SKELETON - USE strategy classes:**
 
 resolve_conflicts(state: dict) -> dict
+- Get strategy instance from state (OptimisticStrategy, BatchStrategy, or PerConflictStrategy)
 - Get IMergeWrapper instance from state
+- Get Resolver instance from state
+- Initialize conflicts_resolved_this_batch = 0
 - Loop:
   - conflict = imerge.get_current_conflict()
   - If conflict is None: break (no more conflicts)
@@ -429,48 +460,41 @@ resolve_conflicts(state: dict) -> dict
       - Log resolution with reasoning
       - Store ResolutionResult in state.resolutions list
   - imerge.continue_after_resolution()
-  - Test if this is per-conflict strategy: if so, break after one conflict
+  - conflicts_resolved_this_batch += 1
+  - **Check strategy.should_build_now(conflicts_resolved_this_batch):**
+    - If True: break (build/test now)
+    - If False: continue resolving
 - Update state with:
   - resolutions: list[ResolutionResult]
   - conflicts_remaining: bool
 - Return updated state
 
 **Key Detail:**
-A single merge commit pair (i1, i2) may have conflicts in multiple files. A single file may have multiple conflicts. The loop structure is:
-- While conflict_pair exists from imerge.get_current_conflict():
-  - Get files with conflicts for this pair
-  - For each file:
-    - Count conflicts in file
-    - For each conflict_num from 1 to count:
-      - Call resolve_conflict_interactive(file, conflict_num, context)
-  - Call imerge.continue_after_resolution()
-  - If strategy is per_conflict: break to test build after each conflict pair
+The strategy class determines when to stop resolving and build/test. Don't hardcode strategy logic in the node - call strategy.should_build_now() to decide.
 
-**Build Node (src/workflow/nodes/build.py):**
+**Build and Test Node (src/workflow/nodes/build_test.py) - SKELETON:**
 
-build(state: dict) -> dict
+build_node(state: dict) -> dict
 - Get BuildRunner instance from state
-- Get build command from config
-- Call build_runner.run_build(command)
+- Get build_test command from config
+- Call build_runner.run_build_test(command)
 - Update state with:
   - build_result: BuildResult
   - build_success: bool
 - Log result (success or failure with returncode)
 - Return updated state
 
-**Test Node (src/workflow/nodes/test.py):**
-
-test(state: dict) -> dict
-- Get TestRunner instance from state
-- Get test command from config
-- Call test_runner.run_test(command)
+test_node(state: dict) -> dict
+- Get BuildRunner instance from state (reuse for tests)
+- Get build_test command from config
+- Call build_runner.run_build_test(command)
 - Update state with:
-  - test_result: TestResult
+  - test_result: BuildResult (same structure)
   - test_success: bool
 - Log result (success or failure with returncode)
 - Return updated state
 
-**Finalize Node (src/workflow/nodes/finalize.py):**
+**Finalize Node (src/workflow/nodes/finalize.py) - SKELETON:**
 
 finalize(state: dict) -> dict
 - Get IMergeWrapper instance from state
@@ -482,48 +506,20 @@ finalize(state: dict) -> dict
 - Log: "Merge finalized to commit {sha}"
 - Return updated state
 
-### 9. Write simple main.py
+### 8. Simple workflow execution - Already implemented differently
 
-Linear workflow without LangGraph, hardcoded per-conflict strategy.
+**Architecture Note:**
+The original plan called for a simple linear workflow in main.py. Instead, the implemented architecture uses:
+- main.py: Minimal entry point (loads settings, creates SplintercatApp, runs it)
+- src/app.py: SplintercatApp that orchestrates workflow via LangGraph
+- src/workflow/graph.py: Full graph definition with routing logic (IMPLEMENTED)
 
-**Structure:**
+**What was planned:** Linear workflow with hardcoded per-conflict strategy
+**What exists:** Full LangGraph workflow with strategy selection and recovery
 
-Main function:
-- Load settings from config
-- Setup logging based on verbosity
-- Initialize components:
-  - CommandRunner with interactive flag
-  - IMergeWrapper with workdir and imerge name
-  - ToolRegistry with Layer 1 tools (ViewConflict, ViewMoreContext, ResolveConflict)
-  - Resolver with model config and tool registry
-  - BuildRunner with workdir, build output_dir, and build timeout
-  - TestRunner with workdir, test output_dir, and test timeout
-- Create initial state dict with:
-  - source_ref and target_branch from settings
-  - empty resolutions list
-  - component instances (imerge, resolver, build_runner, test_runner)
-- Execute linear workflow:
-  - Phase 1: Call initialize(state)
-  - While conflicts_remaining:
-    - Phase 2: Call resolve_conflicts(state) which resolves ONE conflict pair
-    - Phase 3: Call build(state)
-    - If build failed: log error with log file path and exit with error code
-    - Phase 4: Call test(state)
-    - If test failed: log error with log file path and exit with error code
-  - Phase 5: Call finalize(state)
-- Log success with final commit SHA
+This means we can skip the "simple linear flow" phase and work directly with the full architecture. The graph already has all the routing logic. Nodes just need implementations that use the strategy and recovery classes.
 
-**Key Points:**
-- Hardcoded per-conflict strategy (resolve one pair, build, test, repeat)
-- No recovery - exits on first build or test failure
-- No intelligence - just execute steps in order
-- All components initialized upfront
-- State passed between nodes as dict
-
-**Why per-conflict?**
-It's the simplest to implement and debug. Each conflict resolution is immediately validated with a build and test. If something breaks, we know exactly which resolution caused it. We add batch and optimistic strategies later when we add the Planner.
-
-### 10. Test end-to-end
+### 9. Test end-to-end
 
 Use llvm-mos repository with heaven/main merge.
 
@@ -533,8 +529,7 @@ Use llvm-mos repository with heaven/main merge.
   - source.ref: heaven/main
   - target.branch: stable-test
   - target.workdir: /home/jbyrd/git/llvm-mos
-  - build.command: cd {target.workdir}/build && ninja (fast incremental)
-  - test.command: cd {target.workdir}/build && ninja check-llvm (or subset)
+  - build_test.command: cd {target.workdir}/build && ninja check-llvm
   - model.resolver_model: cheap model for testing
 
 **Test Execution:**
@@ -544,13 +539,13 @@ Use llvm-mos repository with heaven/main merge.
   - First conflict detected
   - LLM uses view_conflict tool
   - LLM resolves conflict with reasoning
-  - Build runs (should be fast with incremental)
-  - Tests run (may take time)
+  - Build runs
+  - Tests run
   - Process repeats for next conflict
   - Eventually finalizes to single merge commit
 
 **Expected Duration:**
-With approximately 10-20 conflicts and 30-60 min test runs per conflict, this could take 5-20 hours. Consider:
+With approximately 10-20 conflicts and test runs per conflict, this could take several hours. Consider:
 - Use smaller test command for testing (single file or small subsystem)
 - Use verbose logging to see progress
 - Be patient - this proves the system works
@@ -572,7 +567,9 @@ With approximately 10-20 conflicts and 30-60 min test runs per conflict, this co
 
 Goal: Detect and report failures intelligently
 
-### 11. Implement Summarizer (src/model/summarizer.py)
+### 10. Implement Summarizer (src/model/summarizer.py) - SKELETON
+
+**Status:** SKELETON - File exists, all methods are pass statements
 
 LLM that extracts actionable information from build and test logs.
 
@@ -648,7 +645,9 @@ For large logs:
 - Test with real LLVM build or test failure log
 - Verify summarizer extracts correct error type and location
 
-### 12. Implement SummarizeFailure node (src/workflow/nodes/summarize_failure.py)
+### 11. Implement SummarizeFailure node (src/workflow/nodes/summarize_failure.py) - SKELETON
+
+**Status:** SKELETON - File exists, pass statement
 
 summarize_failure(state: dict) -> dict
 - Get Summarizer instance from state (or create)
@@ -670,41 +669,18 @@ Excerpt:
            ~~~~~~~~~~  ^
   1 error generated.
 
-### 13. Update main.py
+### 12. Update main.py or app.py
 
 Add conditional handling for build and test failures.
 
-**Changes to main.py:**
+**Changes needed:**
 
-After build node:
-- If build failed:
-  - Log warning about build failure
-  - Create Summarizer instance if needed
-  - Add to state
-  - Call summarize_failure(state)
-  - Extract summary from state
-  - Log detailed failure summary:
-    - Type, location, root cause
-    - Log file path for deep inspection
-  - Log "No automatic recovery yet. Exiting."
-  - Exit with error code
-
-After test node:
-- If test failed:
-  - Log warning about test failure
-  - Create Summarizer instance if needed
-  - Add to state
-  - Call summarize_failure(state)
-  - Extract summary from state
-  - Log detailed failure summary:
-    - Type, location, root cause
-    - Log file path for deep inspection
-  - Log "No automatic recovery yet. Exiting."
-  - Exit with error code
+The workflow graph already routes to summarize_failure on build/test failure.
+Just need to ensure the graph properly handles the END state when abort decision is made.
 
 **Still no automatic recovery** - we just report the failure intelligently and exit.
 
-### 14. Test with intentional failures
+### 13. Test with intentional failures
 
 Create scenarios that will fail builds or tests to verify summarizer works.
 
@@ -736,11 +712,47 @@ Delete a function definition that's needed:
 - User can understand what went wrong from the summary
 - Log file path is provided for deep debugging
 
-## Phase 5: Strategic Planning
+## Phase 5: Recovery System
 
-Goal: Model makes strategic decisions about merge approach and recovery
+Goal: Implement recovery system that handles build/test failures
 
-### 15. Implement Planner (src/model/planner.py)
+**Recovery Classes - IMPLEMENTED (src/recovery/):**
+- base.py: Recovery protocol with execute() method
+- retry_all.py: Re-resolve all conflicts with failure context (IMPLEMENTED - working logic)
+- retry_specific.py: Re-resolve specific identified conflicts (IMPLEMENTED - working logic)
+- bisect.py: Binary search to find problematic resolution (IMPLEMENTED - working logic)
+- switch_strategy.py: Change to more conservative strategy (IMPLEMENTED - working logic)
+
+### 14. Implement execute_recovery node - SKELETON, USE recovery classes
+
+**Status:** SKELETON - File exists, pass statement
+
+**Execute Recovery Node (src/workflow/nodes/execute_recovery.py) - SKELETON - USE recovery classes:**
+
+execute_recovery(state: dict) -> dict:
+- Get recovery decision from state
+- Increment state current_attempt
+- Check if attempts >= max_retries:
+  - If so: log warning, set decision to abort, return
+- **Get appropriate recovery class instance based on decision:**
+  - "retry_all": Use RetryAllRecovery class
+  - "retry_specific": Use RetrySpecificRecovery class
+  - "bisect": Use BisectRecovery class
+  - "switch_strategy": Use SwitchStrategyRecovery class
+- **Call recovery.execute(state) to apply recovery:**
+  - Recovery class handles clearing resolutions
+  - Recovery class adds failure context
+  - Recovery class updates strategy if switching
+- Reset conflicts_remaining to True (to re-enter resolution loop)
+- Record attempt in attempt_history
+- Return updated state
+
+**Key Detail:**
+Don't reimplement recovery logic in the node. The recovery classes in src/recovery/ already implement each recovery strategy. The execute_recovery node just selects and invokes the appropriate recovery class.
+
+### 15. Implement Planner (src/model/planner.py) - SKELETON
+
+**Status:** SKELETON - File exists, all methods are pass statements
 
 LLM that makes high-level strategic decisions.
 
@@ -890,9 +902,11 @@ Output JSON with fields: decision (one of the five options), conflicts_to_retry 
   - Repeated same error should choose switch-strategy
   - Multiple failures, no pattern should choose abort
 
-### 16. Implement planning nodes
+### 16. Implement planning nodes - SKELETON
 
-**PlanStrategy Node (src/workflow/nodes/plan_strategy.py):**
+**Status:** SKELETON - Files exist, all pass statements
+
+**PlanStrategy Node (src/workflow/nodes/plan_strategy.py) - SKELETON:**
 
 plan_strategy(state: dict) -> dict
 - Create Planner instance
@@ -901,14 +915,17 @@ plan_strategy(state: dict) -> dict
   - Estimate conflicts via git merge --no-commit (then abort)
   - Get available strategies from config
 - Call planner.choose_initial_strategy(merge_context)
+- **Create strategy instance based on decision:**
+  - If "optimistic": Create OptimisticStrategy()
+  - If "batch": Create BatchStrategy(batch_size)
+  - If "per_conflict": Create PerConflictStrategy()
 - Update state with:
   - strategy_decision: StrategyDecision
-  - current_strategy: str
-  - batch_size: int | None
+  - strategy: Strategy instance (not just string!)
 - Log decision with reasoning at INFO level
 - Return updated state
 
-**PlanRecovery Node (src/workflow/nodes/plan_recovery.py):**
+**PlanRecovery Node (src/workflow/nodes/plan_recovery.py) - SKELETON:**
 
 plan_recovery(state: dict) -> dict
 - Get Planner instance (or create)
@@ -926,37 +943,10 @@ plan_recovery(state: dict) -> dict
 - Log decision with reasoning at INFO level
 - Return updated state
 
-### 17. Update resolve_conflicts node for strategy support
+**Key Detail:**
+The plan_strategy node creates the actual strategy instance (OptimisticStrategy, BatchStrategy, or PerConflictStrategy) and stores it in state. The resolve_conflicts node then uses this instance.
 
-**Changes to resolve_conflicts node:**
-
-The node must now respect the strategy decision:
-
-Define resolve_conflicts function:
-- Get strategy from state current_strategy
-- Get batch_size from state if applicable
-- Initialize conflicts_resolved_this_batch to 0
-- Get imerge and resolver from state
-- Initialize empty resolutions list
-- Loop:
-  - Get conflict pair from imerge.get_current_conflict()
-  - If None: set conflicts_remaining to False and break
-  - Get files with conflicts for this pair
-  - For each file:
-    - Count conflicts in file
-    - For each conflict_num from 1 to count:
-      - Call resolver.resolve_conflict_interactive with context
-      - Append result to resolutions
-  - Call imerge.continue_after_resolution()
-  - Increment conflicts_resolved_this_batch
-  - Check strategy:
-    - If per_conflict: break (build/test after each conflict pair)
-    - If batch: break if conflicts_resolved_this_batch >= batch_size
-    - If optimistic: continue (resolve all before building/testing)
-- Update state with resolutions list
-- Return updated state
-
-### 18. Test planner in isolation
+### 17. Test planner in isolation
 
 Test the Planner before integrating into workflow.
 
@@ -991,203 +981,62 @@ Create unit tests that:
 - JSON parsing is robust
 - Defaults are applied when LLM gives invalid response
 
-## Phase 6: LangGraph Integration
+## Phase 6: Graph Integration
 
-Goal: Full MVP with state machine and recovery
+Goal: Complete the workflow by implementing all nodes to work with the graph
 
-### 19. Implement LangGraph workflow (src/workflow/graph.py)
+**Graph Structure - IMPLEMENTED (src/workflow/graph.py):**
 
-Create state machine that orchestrates the entire merge process with recovery.
+The complete LangGraph workflow already exists with:
+- All nodes defined (initialize, plan_strategy, resolve_conflicts, build, test, summarize_failure, plan_recovery, execute_recovery, finalize)
+- All edges defined (simple and conditional)
+- Routing functions implemented (_after_build, _after_test, _after_recovery_plan)
+
+**What's needed:** Implement the node functions to use strategy/recovery classes
+
+### 18. Complete node implementations
+
+**Nodes to implement (in src/workflow/nodes/) - ALL SKELETON:**
+- initialize.py: Start git-imerge merge (SKELETON)
+- plan_strategy.py: Create strategy instance based on Planner decision (SKELETON)
+- resolve_conflicts.py: Use strategy.should_build_now() to control loop (SKELETON)
+- build_test.py: Run build and test (SKELETON)
+- summarize_failure.py: Extract error information from logs (SKELETON)
+- plan_recovery.py: Get recovery decision from Planner (SKELETON)
+- execute_recovery.py: Use recovery.execute() to apply recovery (SKELETON)
+- finalize.py: Call imerge.finalize() (SKELETON)
+
+**Key Architecture Points:**
+- Nodes are simple coordinators
+- Strategy classes (in src/strategy/) control resolution batching
+- Recovery classes (in src/recovery/) handle failure recovery
+- Nodes don't contain complex logic - they delegate to classes
 
 **State Schema (src/state/workflow.py):**
 
-MergeWorkflowState (TypedDict):
-- Core tracking:
-  - imerge_name: str
-  - source_ref: str
-  - target_branch: str
-  - workdir: Path
-- Strategy:
-  - current_strategy: str
-  - batch_size: int | None
-  - strategy_decision: StrategyDecision | None
-- Current work:
-  - conflicts_remaining: bool
-  - resolutions: list[ResolutionResult]
-  - current_attempt: int
-- Build and test results:
-  - build_result: BuildResult | None
-  - test_result: TestResult | None
-  - failure_summary: BuildFailureSummary | None
-- Recovery:
-  - recovery_decision: RecoveryDecision | None
-  - attempt_history: list[AttemptRecord]
-- Components (not serialized):
-  - imerge: IMergeWrapper
-  - resolver: Resolver
-  - build_runner: BuildRunner
-  - test_runner: TestRunner
-  - summarizer: Summarizer
-  - planner: Planner
-- Final result:
-  - final_commit: str | None
-  - status: str (initialized | in_progress | complete | failed)
+The workflow state should include:
+- Core tracking: imerge_name, source_ref, target_branch, workdir
+- Strategy: strategy instance (not just string!), strategy_decision
+- Current work: conflicts_remaining, resolutions, current_attempt
+- Build/test results: build_result, test_result, failure_summary
+- Recovery: recovery_decision, attempt_history
+- Components: imerge, resolver, build_runner, summarizer, planner
+- Final: final_commit, status
 
-**Graph Structure:**
+### 19. Application integration - Already done
 
-Nodes:
-- initialize: Start git-imerge merge
-- plan_strategy: Planner chooses initial strategy
-- resolve_conflicts: Resolve according to strategy
-- build: Run fast incremental build to detect compile errors
-- test: Run complete test suite to validate correctness
-- summarize_failure: Extract error information
-- plan_recovery: Planner decides recovery approach
-- execute_recovery: Apply recovery decision
-- finalize: Simplify to single merge commit
+**Architecture Note:**
+The original plan called for rewriting main.py to build the graph. Instead, the architecture already has:
+- main.py: Minimal entry point (creates SplintercatApp and runs it) (IMPLEMENTED)
+- src/app.py: SplintercatApp that creates workflow via create_workflow() (IMPLEMENTED)
+- src/workflow/graph.py: Full graph definition with all routing (IMPLEMENTED)
 
-Edges:
-- START leads to initialize
-- initialize leads to plan_strategy
-- plan_strategy leads to resolve_conflicts
-- resolve_conflicts leads to build
-- build leads to conditional routing:
-  - If success: go to test
-  - If failure: go to summarize_failure
-- test leads to conditional routing:
-  - If success AND conflicts_remaining: go to resolve_conflicts (next batch)
-  - If success AND NOT conflicts_remaining: go to finalize
-  - If failure: go to summarize_failure
-- summarize_failure leads to plan_recovery
-- plan_recovery leads to conditional routing based on decision:
-  - If retry-all: reset and go to resolve_conflicts
-  - If retry-specific: go to resolve_conflicts with specific conflicts
-  - If bisect: go to execute_bisect then resolve_conflicts
-  - If switch-strategy: go to plan_strategy with new strategy
-  - If abort: go to END with failure status
-- execute_recovery leads to resolve_conflicts
-- finalize leads to END
+**What's needed:**
+- Ensure create_workflow() properly initializes components and passes them to nodes
+- May need to create component instances in app.py before creating workflow
+- Or pass settings to workflow and let nodes create components as needed
 
-**Routing Functions:**
-
-after_build(state: MergeWorkflowState) -> str:
-- If build_result.success: return "test"
-- Else: return "summarize_failure"
-
-after_test(state: MergeWorkflowState) -> str:
-- If test_result.success:
-  - If conflicts_remaining: return "resolve_conflicts"
-  - Else: return "finalize"
-- Else: return "summarize_failure"
-
-after_plan_recovery(state: MergeWorkflowState) -> str:
-- Get decision from recovery_decision.decision
-- If decision is "abort": return END
-- If decision is "switch-strategy": return "plan_strategy"
-- Else: return "execute_recovery"
-
-**Retry Tracking:**
-
-The graph must enforce max_retries:
-- Increment current_attempt in execute_recovery node
-- Check against max_retries before recovery
-- If exceeded: force decision to "abort"
-
-**Execute Recovery Node (src/workflow/nodes/execute_recovery.py):**
-
-execute_recovery(state: dict) -> dict:
-- Get recovery decision from state
-- Increment state current_attempt
-- Check if attempts >= max_retries:
-  - If so: log warning, set decision to abort, return
-- Based on decision:
-  - retry-all: Clear resolutions, add failure context to resolver context
-  - retry-specific: Filter resolutions to keep only ones not being retried, add failure context
-  - bisect: Implement bisect logic (complex - see below)
-  - switch-strategy: Update current_strategy and batch_size
-- Reset conflicts_remaining to True (to re-enter resolution loop)
-- Record attempt in attempt_history
-- Return updated state
-
-**Bisect Implementation:**
-
-Bisect is complex and requires multiple test runs:
-1. Divide resolutions into two halves
-2. Apply first half, test
-3. Apply second half, test
-4. Identify which half(s) failed
-5. Recursively bisect failing half
-6. Eventually narrow down to specific problematic resolution(s)
-7. Mark those for retry
-
-For MVP, implement simplified bisect:
-- Split resolutions in half
-- Test first half only
-- If fails: retry first half
-- If succeeds: retry second half
-- This is O(log N) builds but doesn't fully isolate (good enough for MVP)
-
-**AttemptRecord Model (src/state/workflow.py):**
-
-AttemptRecord:
-- attempt_number: int
-- strategy: str
-- conflicts_resolved: int
-- resolutions: list[ResolutionResult]
-- build_result: BuildResult | None
-- test_result: TestResult | None
-- failure_summary: BuildFailureSummary | None
-- recovery_decision: RecoveryDecision | None
-- timestamp: datetime
-
-### 20. Rewrite main.py to use LangGraph
-
-Replace linear workflow with LangGraph execution.
-
-**New main.py structure:**
-
-Import LangGraph components (StateGraph, END)
-
-Define main function:
-- Load settings from config
-- Setup logging based on verbosity
-- Initialize all components:
-  - CommandRunner with interactive flag
-  - IMergeWrapper with workdir and imerge name
-  - ToolRegistry and register all Layer 1 tools
-  - Resolver with model config and tool registry
-  - BuildRunner with workdir, build output_dir, and build timeout
-  - TestRunner with workdir, test output_dir, and test timeout
-  - Summarizer with model config
-  - Planner with model config
-- Build LangGraph workflow:
-  - Create StateGraph with MergeWorkflowState schema
-  - Add all nodes (initialize, plan_strategy, resolve_conflicts, build, test, summarize_failure, plan_recovery, execute_recovery, finalize)
-  - Set entry point to initialize
-  - Add simple edges (initialize to plan_strategy, plan_strategy to resolve_conflicts, resolve_conflicts to build, summarize_failure to plan_recovery, execute_recovery to resolve_conflicts, finalize to END)
-  - Add conditional edges (build to after_build routing, test to after_test routing, plan_recovery to after_plan_recovery routing)
-  - Compile the workflow
-- Create initial state dict with:
-  - source_ref, target_branch, workdir, imerge_name from settings
-  - current_attempt: 0
-  - Empty attempt_history list
-  - conflicts_remaining: True
-  - Empty resolutions list
-  - status: "initialized"
-  - All component instances
-- Run workflow by invoking app with initial state
-- Report results:
-  - If status is "complete": log success with final commit SHA, exit with success code
-  - Else: log error, log last failure root cause if available, exit with error code
-
-**Key Points:**
-- LangGraph manages state transitions
-- Routing is declarative via conditional edges
-- All logic is in nodes
-- State is passed between nodes automatically
-- Graph is compiled once, then invoked
-
-### 21. Test full MVP
+### 20. Test full MVP
 
 Comprehensive testing of the complete system.
 
@@ -1256,11 +1105,13 @@ Test each recovery approach:
 
 Goal: Add Layer 2 and Layer 3 tools for complex conflict resolution
 
-### 22. Implement Layer 2 tools (git investigation)
+### 21. Implement Layer 2 tools (git investigation) - SKELETON
 
-These tools help LLM understand why changes were made.
+**Status:** SKELETON - File exists (src/tools/git.py), execute() returns stubs
 
-**GitShowCommitTool (src/tools/git.py):**
+These tools help LLM understand why changes were made. Tool infrastructure exists in src/tools/, need to implement tool logic.
+
+**GitShowCommitTool (src/tools/git.py) - SKELETON - needs implementation:**
 
 Parameters:
 - ref: str (commit SHA or ref like "HEAD", "FETCH_HEAD")
@@ -1291,7 +1142,7 @@ Output example format:
     At line 78: removed bool EnableRemat = true;
     At line 79: removed bool ScannedRemattable = false;
 
-**GitLogTool (src/tools/git.py):**
+**GitLogTool (src/tools/git.py) - SKELETON - needs implementation:**
 
 Parameters:
 - file: str (optional - log for specific file)
@@ -1310,7 +1161,7 @@ Output example format:
     789abcd Update: Add support for new target architecture
     (and more...)
 
-**ShowMergeSummaryTool (src/tools/merge.py):**
+**ShowMergeSummaryTool (src/tools/merge.py) - SKELETON - needs implementation:**
 
 Parameters: none
 
@@ -1334,7 +1185,7 @@ Output example format:
       - llvm/lib/Target/MOS/ (3 conflicts)
       - llvm/tools/llvm-readobj/ (5 conflicts)
 
-**ListAllConflictsTool (src/tools/merge.py):**
+**ListAllConflictsTool (src/tools/merge.py) - SKELETON - needs implementation:**
 
 Parameters: none
 
@@ -1355,11 +1206,13 @@ Output example format:
 
   (more conflict pairs...)
 
-### 23. Implement Layer 3 tools (codebase search)
+### 22. Implement Layer 3 tools (codebase search) - SKELETON
 
-These tools help LLM search for information in the codebase.
+**Status:** SKELETON - File exists (src/tools/search.py), execute() returns stubs
 
-**GrepCodebaseTool (src/tools/search.py):**
+These tools help LLM search for information in the codebase. Tool infrastructure exists in src/tools/, need to implement tool logic.
+
+**GrepCodebaseTool (src/tools/search.py) - SKELETON - needs implementation:**
 
 Parameters:
 - pattern: str (regex pattern to search for)
@@ -1388,7 +1241,7 @@ Output example format:
 
   (more matches...)
 
-**GrepInFileTool (src/tools/search.py):**
+**GrepInFileTool (src/tools/search.py) - SKELETON - needs implementation:**
 
 Parameters:
 - file: str (specific file to search)
@@ -1415,11 +1268,11 @@ Output example format:
 
   (all matches in file...)
 
-### 24. Register new tools and update resolver
+### 23. Register new tools and update resolver - SKELETON
 
 **Update ToolRegistry initialization:**
 
-In main.py tool setup:
+Tool registration happens during workflow initialization (in src/app.py or in the workflow nodes):
 - Create ToolRegistry instance
 - Register Layer 1 core conflict tools:
   - ViewConflictTool with workdir
@@ -1447,7 +1300,7 @@ Additional tools available:
 
 Use these tools when you need more context to make a decision.
 
-### 25. Test with conflicts requiring investigation
+### 24. Test with conflicts requiring investigation
 
 Create test scenarios that benefit from additional tools.
 
@@ -1485,7 +1338,7 @@ Setup: Upstream deleted feature code, fork has MOS-specific usage
 
 Goal: Production-ready MVP
 
-### 26. Add comprehensive logging
+### 25. Add comprehensive logging
 
 Ensure all decisions and actions are logged with full context.
 
@@ -1551,7 +1404,7 @@ Use structured logging with clear prefixes:
   2024-01-15 14:33:12 | INFO     | [Resolver] Resolution: theirs (accept deletion)
   2024-01-15 14:33:12 | INFO     | [Resolver] Reasoning: Upstream moved function to bar.cpp
 
-### 27. Add error handling
+### 26. Add error handling
 
 Handle all expected error cases gracefully with actionable messages.
 
@@ -1602,10 +1455,10 @@ Merge conflict can't be applied:
 **Build and Test Errors:**
 
 Build or test timeout:
-- Logged by BuildRunner or TestRunner
+- Logged by BuildRunner
 - Summarizer should detect timeout
 - Planner should handle timeout differently (may be resource issue, not resolution error)
-- Suggest: "Increase build.timeout or test.timeout in config if builds/tests are genuinely slow"
+- Suggest: "Increase build_test.timeout in config if builds/tests are genuinely slow"
 
 Build or test command not found:
 - Detect early (before starting merge)
@@ -1626,7 +1479,7 @@ Can't write resolved file:
 - File locked: rare, suggest closing editors
 
 Log directory doesn't exist:
-- Create automatically in BuildRunner and TestRunner
+- Create automatically in BuildRunner
 - Log creation at DEBUG level
 
 Config file not found:
@@ -1654,11 +1507,11 @@ Example format:
   To fix:
     1. Verify ninja is installed: which ninja
     2. Verify build directory exists: ls {target.workdir}/build
-    3. Check config.yaml build.command setting
+    3. Check config.yaml build_test.command setting
 
   For more details, see: splintercat.log
 
-### 28. Documentation
+### 27. Documentation
 
 Update all documentation to reflect implemented system.
 
@@ -1725,7 +1578,7 @@ Document implemented tools:
 - Explain how LLM uses tools
 - Show example conversations
 
-### 29. Real-world testing
+### 28. Real-world testing
 
 Test with actual LLVM merge to validate MVP.
 
@@ -1739,8 +1592,7 @@ Repository: llvm-mos
 Configuration:
 - Strategy: Let planner choose (likely batch)
 - Model: Use production models (not cheap test models)
-- Build: Fast incremental ninja build
-- Test: Full ninja check-llvm (may take 30-60 min per test)
+- Build/Test: ninja check-llvm
 - Timeout: 14400 seconds (4 hours)
 
 Preparation:
@@ -1812,7 +1664,7 @@ Based on results:
 - Improve error handling for issues encountered
 - Update documentation with real-world insights
 
-### 30. Performance and cost optimization (Post-MVP)
+### 29. Performance and cost optimization (Post-MVP)
 
 After successful real-world test, optimize for production use.
 
@@ -1851,7 +1703,7 @@ After successful real-world test, optimize for production use.
 **Include in MVP:**
 - Automatic conflict resolution with tool-based LLM architecture
 - Three merge strategies (optimistic, batch, per_conflict) chosen by Planner
-- Separate build validation (fast incremental) and test validation (complete test suite)
+- Unified build and test validation via BuildRunner
 - LLM-driven strategic planning and recovery
 - Multiple recovery strategies (retry-all, retry-specific, bisect, switch-strategy, abort)
 - Complete merge to single commit via git-imerge
