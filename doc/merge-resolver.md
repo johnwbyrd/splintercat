@@ -134,9 +134,29 @@ For the LiveRangeEdit.h conflict:
 
 ## Tool Interface
 
+The LLM has access to tools in order of priority:
+
+**Core Workspace Tools (MVP - Phase 2)**:
+- list_files, read_file, write_file, cat_files, submit_resolution
+- These are the minimum needed to resolve conflicts
+
+**Validation Tools (MVP - Phase 2)**:
+- build, test
+- Let LLM validate complex resolutions before submitting
+
+**Investigation Tools (Enhancement - Phase 3-4)**:
+- git_log, git_show_commit, grep_codebase, grep_in_file
+- Improve accuracy by understanding intent
+
+**Advanced Tools (Future - Phase 5+)**:
+- Language server integration, semantic analysis
+- Add deep code understanding
+
+### Core Workspace Tools
+
 Five simple, composable tools for working with the conflict workspace.
 
-### list_files()
+#### list_files()
 
 List all available files with descriptions and line counts.
 
@@ -229,7 +249,7 @@ cat_files(["before.txt", "theirs.txt", "after.txt"], "resolution.txt")
 → Created resolution.txt (20 lines) from 3 files
 ```
 
-### submit_resolution(filename)
+#### submit_resolution(filename)
 
 Submit the final resolution, applying it to the actual conflicted file.
 
@@ -249,9 +269,110 @@ submit_resolution("resolution.txt")
 → Resolution applied successfully. File staged with git.
 ```
 
-## Additional Investigation Tools
+### Validation Tools
 
-The file-based workspace tools work alongside existing investigation tools.
+Tools to validate resolutions before submitting, useful for complex changes.
+
+#### build()
+
+Build/compile the code with the current resolution applied (without submitting).
+
+**Parameters**: None
+
+**Returns**: Build result with success/failure and error details
+
+**When to use**:
+- Complex custom merges
+- Algorithm changes
+- Uncertain about syntax/compilation
+- Low confidence resolutions
+
+**Example (success)**:
+```
+cat_files(["before.txt", "merged.txt", "after.txt"], "resolution.txt")
+
+build()
+→ Build PASSED
+→ Compilation successful
+→ 0 errors, 1 warning
+→ Warning: Unused variable 'oldFlag' at line 45
+
+submit_resolution("resolution.txt")
+```
+
+**Example (failure - iterate)**:
+```
+cat_files(["before.txt", "merged.txt", "after.txt"], "resolution.txt")
+
+build()
+→ Build FAILED
+→ error: undefined reference to 'RematerializationInfo'
+→ at line 78 in merged section
+
+write_file("merged_v2.txt", "fixed version with updated references")
+cat_files(["before.txt", "merged_v2.txt", "after.txt"], "resolution.txt")
+
+build()
+→ Build PASSED
+
+submit_resolution("resolution.txt")
+```
+
+#### test()
+
+Run tests with the current resolution applied (without submitting).
+
+**Parameters**: None
+
+**Returns**: Test results with pass/fail counts and failure details
+
+**When to use**:
+- Logic changes that affect behavior
+- After build() passes but want to verify correctness
+- Changes to core algorithms
+- MOS-specific code modifications
+
+**Example (success)**:
+```
+build()
+→ Build PASSED
+
+test()
+→ Tests PASSED
+→ 156 tests run, 156 passed
+→ All test suites passed
+
+submit_resolution("resolution.txt")
+```
+
+**Example (failure - reconsider)**:
+```
+build()
+→ Build PASSED
+
+test()
+→ Tests FAILED
+→ 156 tests run, 154 passed, 2 failed
+→
+→ FAILED: TestRegisterAllocation::testMOSTarget
+→   Expected: rematerialization enabled
+→   Actual: rematerialization disabled
+→
+→ FAILED: TestCodeGen::testMOS6502
+→   Assertion failed at line 234
+
+Analysis: Tests show upstream changes break MOS-specific behavior.
+Safer to keep ours.
+
+cat_files(["before.txt", "ours.txt", "after.txt"], "resolution.txt")
+submit_resolution("resolution.txt")
+```
+
+**Note**: build() and test() apply the resolution temporarily to a test environment. They do NOT submit the resolution - that requires explicit submit_resolution() call.
+
+## Investigation Tools
+
+The file-based workspace tools work alongside investigation tools that help understand intent and impact.
 
 ### Git Investigation (Layer 2)
 
