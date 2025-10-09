@@ -1,4 +1,4 @@
-"""Main workflow state for LangGraph."""
+"""Main workflow state for graph."""
 
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from src.state.conflict import ConflictInfo, ConflictResolution
 class MergeWorkflowState(BaseModel):
     """State container for the merge workflow.
 
-    This is the main state object that flows through the LangGraph state machine.
+    This is the main state object that flows through the graph state machine.
     """
 
     imerge_name: str

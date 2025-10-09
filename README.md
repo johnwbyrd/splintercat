@@ -32,8 +32,8 @@ Splintercat takes large, complex merges and breaks them into small, manageable p
 ### Components
 
 - **git-imerge**: Subdivides large merges into pairwise commit merges, isolates conflicts efficiently
-- **LangGraph**: Orchestrates workflow, manages state machine, enables resume capability
-- **LLMs** (three roles):
+- **Pydantic AI Graph**: Orchestrates workflow, manages state machine, enables resume capability
+- **Pydantic AI Agents** (three roles):
   - Conflict Resolver: Resolves merge conflicts automatically
   - Build Summarizer: Extracts failure information from build logs
   - Strategic Planner: Makes decisions about merge strategy and recovery
@@ -81,8 +81,7 @@ Python 3.11+ required.
 Dependencies:
 - loguru (logging)
 - pydantic, pydantic-settings (configuration)
-- langchain, langchain-openai (LLM orchestration)
-- langgraph (workflow state machine)
+- pydantic-ai[pydantic-graph] (LLM orchestration and workflow)
 - git-imerge (merge subdivision)
 
 ## Usage

@@ -854,7 +854,7 @@ class WorkspaceTools:
         return f"Resolution accepted from {filename}. Ready to apply."
 ```
 
-### LangGraph Integration
+### Pydantic AI Graph Integration
 
 The file-based tools integrate into the resolution subgraph:
 

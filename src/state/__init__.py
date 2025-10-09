@@ -1,4 +1,4 @@
-"""State models for LangGraph workflow."""
+"""State models for graph workflow."""
 
 from src.state.attempt import MergeAttempt
 from src.state.build import BuildResult

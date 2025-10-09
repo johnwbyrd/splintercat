@@ -6,7 +6,7 @@ from src.tools.base import Tool
 class ToolRegistry:
     """Registry for LLM tools.
 
-    Manages tool registration and provides schemas for LangChain.
+    Manages tool registration and provides schemas for function calling.
     """
 
     def __init__(self):
@@ -36,7 +36,7 @@ class ToolRegistry:
         return self._tools[name]
 
     def get_schemas(self) -> list[dict]:
-        """Get LangChain function schemas for all tools.
+        """Get function schemas for all tools.
 
         Returns:
             List of function schema dicts

@@ -1,4 +1,4 @@
-"""Workflow orchestration using LangGraph."""
+"""Workflow orchestration using graph system."""
 
 from src.workflow.graph import create_workflow
 

@@ -8,7 +8,7 @@ The implementation follows a component-by-variation design where functionality i
 
 **Current Architecture (as implemented):**
 - **main.py**: Minimal entry point - creates SplintercatApp and runs it (IMPLEMENTED)
-- **src/app.py**: SplintercatApp orchestrates the workflow using LangGraph (IMPLEMENTED)
+- **src/app.py**: SplintercatApp orchestrates the workflow using Pydantic AI graph (IMPLEMENTED)
 - **src/workflow/graph.py**: Complete graph definition with all nodes and routing logic (IMPLEMENTED)
 - **src/strategy/**: Strategy classes control resolution batching (IMPLEMENTED)
   - base.py: Strategy protocol
@@ -74,7 +74,7 @@ Configuration classes are implemented:
 
 Core application architecture is in place:
 - main.py: Minimal entry point that creates SplintercatApp and runs it
-- src/app.py: SplintercatApp orchestrates the workflow using LangGraph
+- src/app.py: SplintercatApp orchestrates the workflow using Pydantic AI graph
 - Workflow creation delegated to src/workflow/graph.py
 - Clean separation: main.py → SplintercatApp → create_workflow()
 
@@ -317,8 +317,8 @@ LLM-based resolver that uses tools to investigate and resolve conflicts.
 **Resolver Class:**
 
 __init__(model_config: ModelConfig, tool_registry: ToolRegistry)
-- Initialize LangChain ChatOpenAI with model config
-- Bind tools from registry using .bind_tools(tool_schemas)
+- Initialize LLM agent with model config
+- Bind tools from registry using tool registration
 - Enable function calling mode
 - Store config for logging
 
@@ -381,7 +381,7 @@ The resolver must handle a conversation loop:
 6. LLM analyzes, may call more tools or resolve
 7. Repeat until ResolveConflictTool is called
 
-Use LangChain's standard tool calling pattern:
+Use LLM tool calling integration:
 - Create messages list starting with SystemMessage containing the prompt
 - Loop: invoke LLM, check for tool_calls in response
 - For each tool_call: execute tool, append ToolMessage with result
@@ -519,9 +519,9 @@ The original plan called for a simple linear workflow in main.py. Instead, the i
 - main.py: Minimal entry point (loads settings, creates SplintercatApp, runs it)
 - src/app.py: SplintercatApp that orchestrates workflow via LangGraph
 - src/workflow/graph.py: Full graph definition with routing logic (IMPLEMENTED)
-
 **What was planned:** Linear workflow with hardcoded per-conflict strategy
-**What exists:** Full LangGraph workflow with strategy selection and recovery
+----
+**What exists:** Full Pydantic AI Graph workflow with strategy selection and recovery
 
 This means we can skip the "simple linear flow" phase and work directly with the full architecture. The graph already has all the routing logic. Nodes just need implementations that use the strategy and recovery classes.
 
@@ -1381,10 +1381,10 @@ Build and Test Results:
 - Log path to log file for deep inspection
 
 State Transitions:
-- Log entry to each LangGraph node
+- Log entry to each Pydantic AI Graph node
 - Log state changes within nodes
 - Log routing decisions (which edge taken)
-- Enable LangGraph's built-in debugging
+- Enable Pydantic AI Graph's built-in debugging
 
 **Log File Organization:**
 
@@ -1717,7 +1717,7 @@ After successful real-world test, optimize for production use.
 - Layer 1, 2, and 3 tools for conflict investigation
 
 **Defer to post-MVP:**
-- State persistence for resume capability (LangGraph supports this, just not implementing yet)
+- State persistence for resume capability (Pydantic AI Graph supports this, just not implementing yet)
 - Human-in-loop approval gates (fully automated for MVP)
 - Cost tracking and optimization (basic logging only)
 - Learning from historical patterns (no ML/memory)

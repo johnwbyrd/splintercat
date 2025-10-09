@@ -17,7 +17,7 @@ Traditional approaches either merge everything at once (hard to debug failures) 
 
 ## Solution Approach
 
-Use git-imerge to subdivide merges into pairwise commit merges, employ LLMs for conflict resolution and strategic planning, orchestrate the workflow with LangGraph, and validate resolutions with build/test at strategic points chosen by an LLM planner.
+Use git-imerge to subdivide merges into pairwise commit merges, employ LLMs for conflict resolution and strategic planning, orchestrate the workflow with Pydantic AI's pydantic-graph, and validate resolutions with build/test at strategic points chosen by an LLM planner.
 
 ## Architecture Components
 
@@ -41,7 +41,7 @@ Use git-imerge to subdivide merges into pairwise commit merges, employ LLMs for 
 
 **Output**: Single two-parent merge commit preserving original commit hashes from both branches
 
-### LangGraph (Orchestration)
+### Pydantic AI Graph (Orchestration)
 
 **Purpose**: State machine managing the merge workflow
 
@@ -240,7 +240,7 @@ Via pydantic-settings CLI integration:
 
 ## State Management
 
-### LangGraph State Schema
+### Pydantic AI Graph State Schema
 
 Pydantic models (to be defined during implementation):
 
@@ -737,5 +737,5 @@ Post-MVP features, priority to be determined:
 ## References
 
 - [git-imerge](https://github.com/mhagger/git-imerge) - Incremental merge tool
-- [LangGraph](https://langchain-ai.github.io/langgraph/) - Workflow orchestration framework
+- [Pydantic AI](https://ai.pydantic.dev/) - LLM orchestration and graph workflows
 - [OpenRouter](https://openrouter.ai/) - Unified LLM API access

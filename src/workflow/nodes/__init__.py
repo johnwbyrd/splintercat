@@ -1,4 +1,4 @@
-"""Workflow nodes for LangGraph state machine."""
+"""Workflow nodes for graph state machine."""
 
 from src.workflow.nodes.build_test import build_node, run_tests
 from src.workflow.nodes.execute_recovery import execute_recovery

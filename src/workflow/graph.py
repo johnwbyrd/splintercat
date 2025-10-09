@@ -1,4 +1,4 @@
-"""LangGraph workflow definition."""
+"""Graph workflow definition."""
 
 from langgraph.graph import END, StateGraph
 
@@ -14,7 +14,7 @@ def create_workflow(settings: Settings):
         settings: Application configuration
 
     Returns:
-        Compiled LangGraph workflow
+        Compiled graph workflow
     """
     logger.debug("Building workflow graph")
 
