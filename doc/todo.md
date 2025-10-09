@@ -100,7 +100,8 @@ The implementation follows a component-by-variation design where functionality i
 **Current Architecture (as implemented):**
 - **main.py**: Minimal entry point - creates SplintercatApp and runs it (IMPLEMENTED)
 - **src/app.py**: SplintercatApp orchestrates the workflow using Pydantic AI graph (IMPLEMENTED)
-- **src/workflow/graph.py**: Complete graph definition with all nodes and routing logic (IMPLEMENTED)
+- **src/workflow/graph.py**: Complete graph routing and edge logic (IMPLEMENTED), node implementations skeleton (pass statements)
+- **src/state/**: MergeWorkflowState and related models (comprehensive Pydantic models, IMPLEMENTED)
 - **src/strategy/**: Strategy classes control resolution batching (IMPLEMENTED)
   - base.py: Strategy protocol
   - optimistic.py, batch.py, per_conflict.py: Concrete implementations with working logic
@@ -134,7 +135,6 @@ Nodes are simple coordinators that USE strategy/recovery classes. They don't con
 - Model components: Resolver, Summarizer, Planner (SKELETON - all methods are pass)
 - Tool implementations: conflict.py, git.py, search.py, merge.py (SKELETON - execute() returns "implementation pending")
 - Node implementations: All nodes in src/workflow/nodes/ (SKELETON - all functions are pass)
-- State models: src/state/ (may be incomplete)
 
 **Implementation Strategy:**
 1. ✓ Build foundational components (Phase 1: git-imerge, build/test runners) - COMPLETED
@@ -215,21 +215,19 @@ finalize() -> str
 - Detect and report git-imerge internal errors
 - Provide actionable error messages
 
-**Testing Strategy:**
-- Test with llvm-mos repository (use reset-branches.bash first)
-- Start merge, verify scratch branch created
-- Manually create conflict, verify get_current_conflict() detects it
-- Manually resolve and stage, verify continue_after_resolution() works
-- Complete full merge cycle, verify finalize() produces correct commit
+**Status:** git-imerge wrapper has skeleton implementation using Python API
 
-**Key Insight:**
-git-imerge maintains state in refs/imerge/{name}/ and uses a scratch branch at refs/heads/imerge/{name}. We must respect this workflow: start → [conflict → resolve → stage → continue] → finish.
+**Current State:**
+- Basic structure exists using gitimerge Python library
+- IMerge class exists with start_merge(), get_current_conflict(), etc. methods
+- No comprehensive testing completed - only manual testing mentioned
+- Key methods exist but need validation
 
 ### 3. Implement BuildRunner (src/runner/build.py) - IMPLEMENTED
 
 **Status:** IMPLEMENTED - Wraps CommandRunner with build-specific features
 
-Execute build and test commands with proper logging and timeout handling. Tested with comprehensive test suite in tests/test_buildrunner.py.
+Execute build and test commands with proper logging and timeout handling. Has basic test suite in tests/test_buildrunner.py.
 
 **Core Method:**
 
@@ -247,54 +245,18 @@ run_build_test(command: str) -> BuildResult
 - returncode: int
 - timestamp: datetime
 
-**Implementation Details:**
-- Use CommandRunner for execution with real-time output
-- Write all stdout/stderr to log file as execution happens
-- On timeout: log "Build/test timed out after {timeout} seconds" and kill process
-- Ensure log file is flushed and closed even on errors
-- Log file naming must be consistent for Summarizer to find them
+### 4. Basic testing infrastructure - PARTIALLY IMPLEMENTED
 
-**Error Handling:**
-- Timeout: SIGTERM then SIGKILL if needed
-- Command not found: clear error message
-- Working directory doesn't exist: check before running
-- Disk full: catch and report
-
-**Testing Strategy:**
-- Test with fast command (echo "hello") - should succeed immediately
-- Test with slow command and short timeout - should timeout properly
-- Test with failing command (false) - should capture failure
-- Test with command that writes to stderr - should capture both streams
-- Verify log files are written to correct location with correct naming
-
-### 4. Test infrastructure independently - COMPLETED
-
-Phase 1 testing completed.
-
-**git-imerge wrapper tests - COMPLETED:**
-- ✓ IMerge.start_merge() tested with heaven/main and stable-test
-- ✓ Auto-completed 114 clean merge pairs
-- ✓ Detected first conflict at pair (1, 115)
-- ✓ Identified conflicted file: llvm/tools/llvm-readobj/ELFDumper.cpp
-- ✓ Uses gitimerge Python API directly (no subprocess overhead)
-- Note: Use /home/jbyrd/git/llvm-mos/reset-branches.bash to reset test repository to known good state before testing
-
-**BuildRunner tests - COMPLETED:**
-- ✓ Comprehensive test suite in tests/test_buildrunner.py
-- ✓ test_successful_command - verifies success handling
-- ✓ test_failed_command - verifies failure tracking
-- ✓ test_log_file_content - verifies output capture
-- ✓ test_timeout_handling - verifies 2 second timeout works
-- ✓ test_log_directory_creation - verifies mkdir -p behavior
-- ✓ All tests pass: pytest tests/test_buildrunner.py -v
-
-**Config tests:**
-- Not yet implemented (config.py exists and works but no tests)
-
-**Success Criteria - MET:**
-- ✓ IMerge can start merges and detect conflicts
-- ✓ BuildRunner captures output and handles timeouts
+**Current State:**
+- BuildRunner has test suite (tests/test_buildrunner.py with 5 tests)
+- Only minimal testing exists - not comprehensive end-to-end testing
 - Config loads correctly (verified by main.py running)
+- git-imerge integration needs more validation
+
+**Actual Status:**
+- BuildRunner tests exist and pass
+- git-imerge integration has been manually tested but lacks comprehensive test coverage
+- No integration tests for combined components
 
 ## Phase 2: Tool-Based Resolver
 
