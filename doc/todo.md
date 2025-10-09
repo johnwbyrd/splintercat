@@ -1,5 +1,96 @@
 # Splintercat Implementation TODO
 
+## Current Implementation Status
+
+### Implemented (Phase 1 Infrastructure):
+- Application Architecture: main.py, src/app.py, LangGraph workflow routing
+- Core Infrastructure: Configuration (YAML+env+CLI), logging, CommandRunner
+- git-imerge Integration: Full Python API implementation, tested
+- BuildRunner: Complete with comprehensive test suite (tests/test_buildrunner.py)
+- Strategy Classes: Working implementations (src/strategy/) with should_build_now() logic
+- Recovery Classes: Working implementations (src/recovery/) with execute() logic
+- Tool Registry: Infrastructure exists, all stub implementations
+
+### Not Implemented:
+- All LLM Model Classes: Resolver, Summarizer, Planner - all skeleton classes with pass statements
+- All Workflow Nodes: All pass statements, no real implementation
+- All Tool Implementations: All execute() methods return stub strings
+
+## Implementation Gaps
+
+### Phase 0: Infrastructure Fixes
+- Fix repository workdir template and .splintercat directory handling
+- Update reset branches script to handle .splintercat cleanup
+- Verify complete state schema in src/state/workflow.py
+
+### Phase 1: LLM Model Implementation (PRIMARY PRIORITY)
+1. **Implement Resolver (src/model/resolver.py)**:
+   - Integrate with tool calling architecture from merge-resolver.md
+   - Handle file-based workspace approach
+   - Support retry scenarios with failure context
+
+2. **Implement Summarizer (src/model/summarizer.py)**:
+   - Extract error info from build/test logs
+   - Support large log truncation
+   - Structured output for failure analysis
+
+3. **Implement Planner (src/model/planner.py)**:
+   - Initial strategy selection logic
+   - Recovery planning after build failures
+   - Decision making for abort scenarios
+
+### Phase 2: Tool Layer Implementation
+All current tools return "implementation pending":
+
+**Layer 1 Tools**:
+- ViewConflictTool: Parse conflicts from files
+- ViewMoreContextTool: Extended context viewing
+- ResolveConflictTool: Apply resolutions, stage with git
+
+**Layer 2 Tools** (Investigative):
+- GitShowCommitTool: Get commit details and diffs
+- GitLogTool: Show recent file history
+- ShowMergeSummaryTool: Overall merge statistics
+- ListAllConflictsTool: Current conflict frontier
+
+**Layer 3 Tools** (Search):
+- GrepCodebaseTool: Search across repository
+- GrepInFileTool: Search within specific file
+
+### Phase 3: Workflow Node Implementation
+**Implement nodes to use strategy/recovery classes**:
+
+1. **Initialize Node**: Setup git-imerge merge, validate clean state
+2. **PlanStrategy Node**: Use Planner to choose strategy, create strategy instance
+3. **ResolveConflicts Node**: USE strategy.should_build_now() to control batching loop
+4. **Build/Test Nodes**: Use BuildRunner with timeout and logging
+5. **SummarizeFailure Node**: Extract error information from logs
+6. **PlanRecovery Node**: Make recovery decisions after failures
+7. **ExecuteRecovery Node**: USE recovery.execute() to apply recovery
+8. **Finalize Node**: Call imerge.finalize(), create final merge commit
+
+### Phase 4: State Schema and Integration Testing
+- Verify MergeWorkflowState model has all required fields
+- Test each strategy workflow individually
+- Integration tests for build/test validation
+- Recovery scenario testing
+
+## Updated MVP Scope
+
+### WHAT IS ALREADY WORKING:
+- Git-imerge integration with Python API
+- BuildRunner with timeout, logging, and comprehensive tests
+- All strategy classes with proper should_build_now() logic
+- All recovery classes with proper execute() methods
+- Full LangGraph workflow with routing logic
+
+### WHAT IS STILL TO BE IMPLEMENTED:
+- All 3 LLM models (Resolver/Summarizer/Planner)
+- All 8 workflow nodes (currently pass statements)
+- All tool implementations (currently stub strings)
+- Proper state schema integration
+- Real tests for LLM components
+
 Implementation order for MVP, organized by phases. This guide assumes the tool-based conflict resolution architecture from merge-resolver.md.
 
 ## Architecture Overview
