@@ -1,7 +1,7 @@
 """Main application orchestrator for Splintercat."""
 
 from src.core.config import Settings
-from src.core.log import logger, setup_logging
+from src.core.log import logger
 from src.workflow.graph import create_workflow
 
 
@@ -15,7 +15,7 @@ class SplintercatApp:
             settings: Application configuration
         """
         self.settings = settings
-        setup_logging(settings.verbose)
+        logger.setup(settings.verbose)
 
     def run(self) -> int:
         """Run the merge workflow.

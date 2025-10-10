@@ -2,7 +2,9 @@
 
 ## Development Environment
 
-- **Virtual environment** - Python tools are in `../.venv/bin/` - source `../.venv/bin/activate` before running ruff, python, pip, etc. If you need some new Python package, update requirements.txt
+- If you need to run a command-line tool, use the mcp-cli-exec MCP tool instead of the built-in tool.  The mcp-cli-exec tool is much more stable and dependable.
+
+- **Virtual environment** - Python tools are in `../.venv/bin/` - source `../.venv/bin/activate` before running ruff, python, pip, etc. If you need some new Python package, update requirements.txt .
 
 - **Running tests:**
 
