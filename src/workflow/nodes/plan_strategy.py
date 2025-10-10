@@ -6,15 +6,15 @@ from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, GraphRunContext
 
-from src.state.workflow import MergeWorkflowState
+from src.core.config import State
 
 
 @dataclass
-class PlanStrategy(BaseNode[MergeWorkflowState]):
+class PlanStrategy(BaseNode[State]):
     """Planner chooses initial merge strategy and parameters."""
 
     async def run(
-        self, ctx: GraphRunContext[MergeWorkflowState]
+        self, ctx: GraphRunContext[State]
     ) -> "ResolveConflicts":
         """Choose merge strategy and create strategy instance.
 

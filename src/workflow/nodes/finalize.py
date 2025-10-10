@@ -6,15 +6,15 @@ from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, End, GraphRunContext
 
-from src.state.workflow import MergeWorkflowState
+from src.core.config import State
 
 
 @dataclass
-class Finalize(BaseNode[MergeWorkflowState, None, str]):
+class Finalize(BaseNode[State, None, str]):
     """Simplify merge to single commit and clean up git-imerge state."""
 
     async def run(
-        self, ctx: GraphRunContext[MergeWorkflowState]
+        self, ctx: GraphRunContext[State]
     ) -> End[str]:
         """Complete merge by creating final commit and cleaning up.
 
@@ -23,7 +23,7 @@ class Finalize(BaseNode[MergeWorkflowState, None, str]):
         """
         # TODO: Implement git-imerge finalization
         # For now, just end the workflow
-        ctx.state.status = "complete"
+        ctx.state.runtime.merge.status = "complete"
         return End("mock-final-commit-sha")
 
 # Backward compatibility

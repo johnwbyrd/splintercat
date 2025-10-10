@@ -1,26 +1,25 @@
 """Reset node - discard all git-imerge state."""
 
 from __future__ import annotations
-from pathlib import Path
+
 import subprocess
 from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, GraphRunContext
 
+from src.core.config import State
 from src.core.log import logger
-from src.state.workflow import MergeWorkflowState
 
 
 @dataclass
-class Reset(BaseNode[MergeWorkflowState]):
+class Reset(BaseNode[State]):
     """Reset (discard) all git-imerge state for a merge operation."""
 
-    force: bool = False
-
-    async def run(self, ctx: GraphRunContext[MergeWorkflowState]):
+    async def run(self, ctx: GraphRunContext[State]):
         """Reset all git-imerge state, returning repository to clean state."""
 
-        workdir = ctx.state.settings.target.workdir
+        workdir = ctx.state.config.git.target_workdir
+        force = ctx.state.runtime.reset.force
 
         # Get existing merge names
         existing_merges = self._get_existing_merges(workdir)
@@ -38,27 +37,29 @@ class Reset(BaseNode[MergeWorkflowState]):
             logger.info(f"  {merge_name}: {len(refs)} refs")
 
         # Confirm unless force is set
-        if not self.force:
-            if not await self._confirm_reset(total_refs):
-                logger.info("Reset cancelled by user")
-                return
+        if not force and not await self._confirm_reset(total_refs):
+            logger.info("Reset cancelled by user")
+            return
 
         # Perform reset
         logger.info(f"Resetting {total_refs} refs from {len(existing_merges)} merges...")
         self._reset_all_merges(workdir, existing_merges)
 
         # Update state
-        ctx.state.imerge = None
-        ctx.state.imerge_name = None
-        ctx.state.status = "reset"
+        ctx.state.runtime.reset.merge_names_found = existing_merges
+        ctx.state.runtime.reset.total_refs_deleted = total_refs
+        ctx.state.runtime.reset.status = "complete"
+        ctx.state.runtime.merge.current_imerge = None
 
         logger.info("Git repository reset complete - all imerge state discarded")
 
-    def _get_existing_merges(self, workdir: str) -> list[str]:
+    def _get_existing_merges(self, workdir) -> list[str]:
         """Get list of all existing imerge merge names."""
         try:
             cmd = ["git", "for-each-ref", "--format=%(refname:short)", "refs/imerge"]
-            result = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                cmd, cwd=str(workdir), capture_output=True, text=True, check=True
+            )
             # Extract unique merge names from refs/imerge/NAME/...
             lines = result.stdout.strip().split('\n')
             names = set()
@@ -68,15 +69,17 @@ class Reset(BaseNode[MergeWorkflowState]):
                     parts = line.split('/')
                     if len(parts) >= 3:
                         names.add(parts[2])
-            return sorted(list(names))
+            return sorted(names)
         except subprocess.CalledProcessError:
             return []
 
-    def _get_merge_refs(self, workdir: str, merge_name: str) -> list[str]:
+    def _get_merge_refs(self, workdir, merge_name: str) -> list[str]:
         """Get all refs for a specific merge."""
         try:
             cmd = ["git", "for-each-ref", "--format=%(refname)", f"refs/imerge/{merge_name}/**"]
-            result = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                cmd, cwd=str(workdir), capture_output=True, text=True, check=True
+            )
             return [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
         except subprocess.CalledProcessError:
             return []
@@ -89,7 +92,7 @@ class Reset(BaseNode[MergeWorkflowState]):
         logger.warning("Use 'splintercat reset --force' to force reset without confirmation")
         return False
 
-    def _reset_all_merges(self, workdir: str, merge_names: list[str]):
+    def _reset_all_merges(self, workdir, merge_names: list[str]):
         """Reset all imerge state by deleting all refs."""
         all_refs = []
         for merge_name in merge_names:
@@ -104,6 +107,6 @@ class Reset(BaseNode[MergeWorkflowState]):
         input_data = '\n'.join(delete_commands) + '\n'
 
         cmd = ["git", "update-ref", "--stdin"]
-        subprocess.run(cmd, cwd=workdir, input=input_data, text=True, check=True)
+        subprocess.run(cmd, cwd=str(workdir), input=input_data, text=True, check=True)
 
         logger.info(f"Deleted {len(all_refs)} imerge refs")

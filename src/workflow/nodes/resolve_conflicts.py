@@ -6,15 +6,15 @@ from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, GraphRunContext
 
-from src.state.workflow import MergeWorkflowState
+from src.core.config import State
 
 
 @dataclass
-class ResolveConflicts(BaseNode[MergeWorkflowState]):
+class ResolveConflicts(BaseNode[State]):
     """Resolve conflicts using resolver model."""
 
     async def run(
-        self, ctx: GraphRunContext[MergeWorkflowState]
+        self, ctx: GraphRunContext[State]
     ) -> "Build":
         """Resolve conflicts using resolver model.
 

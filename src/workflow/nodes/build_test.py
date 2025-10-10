@@ -4,15 +4,15 @@ from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, GraphRunContext
 
-from src.state.workflow import MergeWorkflowState
+from src.core.config import State
 
 
 @dataclass
-class Tests(BaseNode[MergeWorkflowState]):
+class Tests(BaseNode[State]):
     """Run test command and determine success/failure."""
 
     async def run(
-        self, ctx: GraphRunContext[MergeWorkflowState]
+        self, ctx: GraphRunContext[State]
     ) -> "Finalize":
         """Execute test command and check result.
 
@@ -25,11 +25,11 @@ class Tests(BaseNode[MergeWorkflowState]):
         return Finalize()
 
 @dataclass
-class Build(BaseNode[MergeWorkflowState]):
+class Build(BaseNode[State]):
     """Run build command and determine success/failure."""
 
     async def run(
-        self, ctx: GraphRunContext[MergeWorkflowState]
+        self, ctx: GraphRunContext[State]
     ) -> "Tests":
         """Execute build command and check result.
 

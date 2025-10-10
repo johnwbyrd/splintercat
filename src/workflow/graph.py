@@ -2,24 +2,19 @@
 
 from pydantic_graph import Graph
 
-from src.core.config import Settings
+from src.core.config import State
 from src.core.log import logger
-from src.state.workflow import MergeWorkflowState
 
 
-def create_workflow(settings: Settings):
+def create_workflow():
     """Create the merge workflow graph.
 
-    Args:
-        settings: Application configuration
-
     Returns:
-        Graph workflow
+        Graph workflow with State as state_type
     """
     logger.debug("Building workflow graph")
 
     # Import nodes (lazy to avoid circular imports)
-    # All converted to BaseNode dataclasses
     from src.workflow.nodes.build_test import Build, Tests
     from src.workflow.nodes.execute_recovery import ExecuteRecovery
     from src.workflow.nodes.finalize import Finalize
@@ -42,7 +37,7 @@ def create_workflow(settings: Settings):
             ExecuteRecovery,
             Finalize,
         ),
-        state_type=MergeWorkflowState
+        state_type=State
     )
 
     return workflow

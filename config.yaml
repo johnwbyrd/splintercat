@@ -1,112 +1,107 @@
 # Splintercat Configuration
-# Model-assisted git merge conflict resolution with build/test validation
+# LLM-assisted git merge conflict resolution with build/test validation
 
-# ==============================================================================
-# SOURCE - What to merge from
-# ==============================================================================
-source:
-  ref: heaven/main  # Git ref to merge (branch, tag, or commit)
+config:
+  # ==============================================================================
+  # GIT - Repository and merge configuration
+  # ==============================================================================
+  git:
+    # Git ref to merge from (branch, tag, or commit)
+    source_ref: heaven/main
 
-# ==============================================================================
-# TARGET - Where to merge to
-# ==============================================================================
-target:
-  # Directory containing the local git repository sources
-  workdir: /home/jbyrd/git/llvm-mos
+    # Directory containing the local git repository
+    target_workdir: /home/jbyrd/git/llvm-mos
 
-  # Branch to merge into
-  branch: stable-test
+    # Branch to merge into
+    target_branch: stable-test
 
-# ==============================================================================
-# BUILD/TEST - Validation command
-# ==============================================================================
-build_test:
-  # Command to run for build/test validation
-  # Runs after conflict resolution to verify correctness
-  # Template {target.workdir} is replaced with target.workdir value
-  command: "cd {target.workdir}/build && ninja check-llvm"
+    # Name for this git-imerge operation (used in git refs)
+    imerge_name: llvm-upstream-merge
 
-  # Directory for storing build/test log files (one timestamped file per attempt)
-  # Template {target.workdir} is replaced with target.workdir value
-  output_dir: "{target.workdir}/.splintercat/build-logs"
+    # Goal determines final merge structure
+    # 'merge' produces a single two-parent merge commit (recommended)
+    # Other options: 'rebase', 'rebase-with-history', 'full'
+    imerge_goal: merge
 
-  # Maximum time allowed for build/test (seconds)
-  timeout: 14400  # 4 hours
+  # ==============================================================================
+  # BUILD - Build and test validation configuration
+  # ==============================================================================
+  build:
+    # Command to run for build/test validation
+    # Runs after conflict resolution to verify correctness
+    # Template {config.git.target_workdir} is replaced with actual value
+    command: "cd {config.git.target_workdir}/build && ninja check-llvm"
 
-# ==============================================================================
-# MODEL - Language model configuration
-# ==============================================================================
-model:
-  # OpenRouter API key
-  # Set via .env file: MODEL__API_KEY=sk-...
-  # Or environment variable: SPLINTERCAT__MODEL__API_KEY=sk-...
-  # api_key: ""  # Leave commented out to use .env or environment variable
+    # Directory for storing build/test log files (one timestamped file per attempt)
+    # Template {config.git.target_workdir} is replaced with actual value
+    output_dir: "{config.git.target_workdir}/.splintercat/build-logs"
 
-  # OpenRouter API base URL
-  base_url: https://openrouter.ai/api/v1
+    # Maximum time allowed for build/test (seconds)
+    timeout: 14400  # 4 hours
 
-  # Model for conflict resolution (cheap/fast model recommended)
-  # Resolves merge conflicts mechanically
-  resolver_model: deepseek/deepseek-v3.2-exp
+  # ==============================================================================
+  # LLM - Language model configuration
+  # ==============================================================================
+  llm:
+    # OpenRouter API key
+    # Best practice: Set via .env file or environment variable
+    # .env file: LLM__API_KEY=sk-...
+    # Env var: SPLINTERCAT__CONFIG__LLM__API_KEY=sk-...
+    api_key: ""  # Will be loaded from .env or environment
 
-  # Model for build log summarization (cheap/fast model recommended)
-  # Extracts failure information from verbose build logs
-  summarizer_model: deepseek/deepseek-v3.2-exp
+    # OpenRouter API base URL
+    base_url: https://openrouter.ai/api/v1
 
-  # Model for strategic planning (smart/expensive model recommended)
-  # Makes decisions about merge strategy and recovery
-  planner_model: deepseek/deepseek-v3.2-exp
+    # Model for conflict resolution (cheap/fast model recommended)
+    # Resolves merge conflicts mechanically
+    resolver_model: deepseek/deepseek-v3.2-exp
 
-# ==============================================================================
-# GIT-IMERGE - Merge subdivision configuration
-# ==============================================================================
-imerge:
-  # Name for this merge operation (used in git refs)
-  name: llvm-upstream-merge
+    # Model for build log summarization (cheap/fast model recommended)
+    # Extracts failure information from verbose build logs
+    summarizer_model: deepseek/deepseek-v3.2-exp
 
-  # Goal determines final merge structure
-  # 'merge' produces a single two-parent merge commit (recommended)
-  # Other options: 'rebase', 'rebase-with-history', 'full'
-  goal: merge
+    # Model for strategic planning (smart/expensive model recommended)
+    # Makes decisions about merge strategy and recovery
+    planner_model: deepseek/deepseek-v3.2-exp
 
-# ==============================================================================
-# MERGE - Strategy and recovery configuration
-# ==============================================================================
-merge:
-  # Maximum number of recovery attempts before aborting
-  max_retries: 5
+  # ==============================================================================
+  # STRATEGY - Merge strategy and recovery configuration
+  # ==============================================================================
+  strategy:
+    # Maximum number of recovery attempts before aborting
+    max_retries: 5
 
-  # Available strategies for Planner to choose from:
-  # - optimistic: resolve all conflicts, then test once (fastest, risky)
-  # - batch: resolve N conflicts, test, repeat (balanced)
-  # - per_conflict: resolve one, test, repeat (slowest, safest)
-  strategies_available: [optimistic, batch, per_conflict]
+    # Available strategies for Planner to choose from:
+    # - optimistic: resolve all conflicts, then test once (fastest, risky)
+    # - batch: resolve N conflicts, test, repeat (balanced)
+    # - per_conflict: resolve one, test, repeat (slowest, safest)
+    available: [optimistic, batch, per_conflict]
 
-  # Default batch size if using batch strategy
-  default_batch_size: 10
+    # Default batch size if using batch strategy
+    default_batch_size: 10
 
-# ==============================================================================
-# LOGGING - Output configuration
-# ==============================================================================
-verbose: false  # Set to true for DEBUG level console output
-interactive: false  # Set to true to prompt before each command
+  # ==============================================================================
+  # GLOBAL FLAGS
+  # ==============================================================================
+  verbose: false  # Set to true for DEBUG level console output
+  interactive: false  # Set to true to prompt before each command
 
 # ==============================================================================
 # NOTES
 # ==============================================================================
-# - Template substitution: {target.workdir} gets replaced with target.workdir value
+# - Template substitution: {config.git.target_workdir} gets replaced with actual value
 #
 # - Environment variables can override any setting using double underscore delimiter:
 #   Examples:
-#     SPLINTERCAT__MODEL__API_KEY=sk-your-key-here
-#     SPLINTERCAT__VERBOSE=true
-#     SPLINTERCAT__MERGE__MAX_RETRIES=10
+#     SPLINTERCAT__CONFIG__LLM__API_KEY=sk-your-key-here
+#     SPLINTERCAT__CONFIG__VERBOSE=true
+#     SPLINTERCAT__CONFIG__STRATEGY__MAX_RETRIES=10
 #
 # - Command-line args can override settings:
 #   Examples:
-#     --model.planner_model=anthropic/claude-opus-4
-#     --verbose=true
-#     --merge.max_retries=10
+#     --config.llm.planner_model=anthropic/claude-opus-4
+#     --config.verbose=true
+#     --config.strategy.max_retries=10
 #
 # - See doc/design.md for complete architecture and design details
-# - See doc/todo.md for implementation roadmap
+# - See doc/todo.md for implementation guide
