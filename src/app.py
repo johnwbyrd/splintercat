@@ -67,4 +67,5 @@ class SplintercatApp:
             "attempts": [],
             "resolutions": [],
             "status": "initialized",
+            "settings": self.settings,  # Add settings to state
         }
