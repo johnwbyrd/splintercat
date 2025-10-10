@@ -140,11 +140,7 @@ Use git-imerge to subdivide merges into pairwise commit merges, employ LLMs for 
 - State serialization for resume capability
 - Already implemented in `src/core/config.py`
 
-#### loguru Logger
-- Console and file logging with rotation
-- Captures all LLM interactions, decisions, and build results
-- DEBUG level to files, INFO level to console
-- Already implemented in `src/core/log.py`
+
 
 ## Workflow
 

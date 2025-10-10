@@ -37,7 +37,7 @@ Splintercat takes large, complex merges and breaks them into small, manageable p
   - Conflict Resolver: Resolves merge conflicts automatically
   - Build Summarizer: Extracts failure information from build logs
   - Strategic Planner: Makes decisions about merge strategy and recovery
-- **Existing infrastructure**: CommandRunner, Pydantic Settings, loguru logging
+- **Existing infrastructure**: CommandRunner, Pydantic Settings, logging
 
 ### Merge Strategies
 
@@ -79,7 +79,6 @@ pip install -r requirements.txt
 Python 3.11+ required.
 
 Dependencies:
-- loguru (logging)
 - pydantic, pydantic-settings (configuration)
 - pydantic-ai[pydantic-graph] (LLM orchestration and workflow)
 - git-imerge (merge subdivision)
