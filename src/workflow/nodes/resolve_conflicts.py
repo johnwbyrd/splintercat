@@ -1,6 +1,7 @@
 """ResolveConflicts node - resolve conflicts using resolver model."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, GraphRunContext

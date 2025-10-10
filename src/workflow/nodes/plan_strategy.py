@@ -1,6 +1,7 @@
 """PlanStrategy node - planner chooses merge strategy."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 from pydantic_graph import BaseNode, GraphRunContext

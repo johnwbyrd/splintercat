@@ -56,7 +56,10 @@ select = [
     "C4",  # flake8-comprehensions
     "SIM", # flake8-simplify
 ]
-ignore = []
+ignore = [
+    "F821",  # pydantic-graph returns Str types, don't bug about it
+    "UP037", # same thing
+]
 
 [tool.ruff.format]
 quote-style = "double"
