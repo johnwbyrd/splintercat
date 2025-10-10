@@ -26,6 +26,9 @@ dependencies = [
     "git-imerge>=1.2.0",
 ]
 
+[project.scripts]
+splintercat = "main:main"
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.1.0",

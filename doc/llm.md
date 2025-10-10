@@ -27,8 +27,12 @@ The llvm-mos repository has multiple remotes for testing:
 
 ## Code Style
 
+- **SCREW BACKWARDS COMPATIBILITY** - Do NOT engineer for backwards compatibility.  BREAK AND REWRITE CODE TOTALLY FROM SCRATCH IF NEEDED, using a superior design and structure.  There are NO existing users.  Doing something "for backward compatibility" is an antifeature.
+
 - **NO EMOJIS** - Do not use emojis anywhere in code, comments, docstrings, commit messages, or markdown files
 - Use ruff - Run ruff check after major changes and make sure to clean up any problems
+
+- **WRITE THE LEAST AMOUNT OF CODE POSSIBLE** - Much of the functionality we need already exists in Pydantic or other python libraries.  USE THEM.  Do not reinvent the wheel.
 
 ## Documentation Style
 
