@@ -1,127 +1,108 @@
 # splintercat
 
-## What This Does
+Merging a thousand upstream commits by hand is miserable. Resolving dozens of conflicts is tedious.
 
-LLM-assisted git merge conflict resolution with build/test validation and intelligent recovery strategies.
+Discovering your merge breaks the build hours later is worse. Now you have no idea which conflict resolution caused the problem.
 
-Splintercat automates merging large upstream branches by:
-- Using git-imerge to subdivide merges into manageable pairwise commits
-- Resolving conflicts automatically with LLMs
-- Validating each resolution with build/test
-- Adapting merge strategy based on build results
-- Recovering intelligently from failures
+Splintercat automates the entire process. It breaks large merges into manageable pieces using git-imerge, resolves conflicts automatically with LLMs, validates each batch with your build and test suite, and recovers intelligently when something goes wrong.
 
-The result is a single clean merge commit that preserves all original commit hashes and passes all tests.
+You get a clean merge commit that preserves history and passes all tests.
 
-## Project Status
+## How it works
 
-**Current Phase**: Design complete, implementation pending
+Splintercat uses git-imerge to subdivide your merge into small pairwise commits. Each conflict gets resolved by an LLM that understands the code context and commit messages.
 
-The architecture is designed and documented in [doc/design.md](doc/design.md). Implementation will begin when we encounter real-world merge scenarios that simpler tools cannot handle.
+The system validates incrementally—testing after small batches of resolutions rather than waiting until the end.
 
-## Design Philosophy
+When builds fail, it analyzes the errors and tries different resolution strategies automatically. Most merges succeed without human intervention.
+
+The result is a single two-parent merge commit, just like a normal merge, with all original commit hashes preserved.
+
+## Why "splintercat"?
 
 From "Fearsome Creatures of the Lumberwoods" by William T. Cox:
 
 > "The method used by the splinter cat is simple and effective. It climbs one tree, and from the uppermost branches bounds down and across toward the tree it wishes to destroy. Striking squarely with its hard face, the splinter cat passes right on, leaving the tree broken and shattered as though struck by lightning or snapped off by the wind."
 
-Splintercat takes large, complex merges and breaks them into small, manageable pieces that can be resolved and validated independently.
-
-## Architecture Overview
-
-### Components
-
-- **git-imerge**: Subdivides large merges into pairwise commit merges, isolates conflicts efficiently
-- **Pydantic AI Graph**: Orchestrates workflow, manages state machine, enables resume capability
-- **Pydantic AI Agents** (three roles):
-  - Conflict Resolver: Resolves merge conflicts automatically
-  - Build Summarizer: Extracts failure information from build logs
-  - Strategic Planner: Makes decisions about merge strategy and recovery
-- **Existing infrastructure**: CommandRunner, Pydantic Settings, logging
-
-### Merge Strategies
-
-- **optimistic**: Resolve all conflicts first, test once (fastest)
-- **batch**: Resolve N conflicts, test, repeat (balanced)
-- **per-conflict**: Resolve one conflict, test, repeat (safest)
-
-Strategy is chosen by the Planner LLM based on merge characteristics.
-
-### Recovery on Build Failure
-
-When builds fail, the Planner LLM analyzes the failure and chooses:
-- **retry-all**: Re-resolve all conflicts with failure context
-- **retry-specific**: Re-resolve only the conflicts that likely caused failure
-- **bisect**: Binary search to find problematic resolution
-- **switch-strategy**: Change to more conservative approach
-- **abort**: Report to human for manual intervention
-
-## Configuration
-
-Configuration is in `config.yaml`. See the file itself for complete documentation with inline comments.
-
-Key configuration areas:
-- **source**: What to merge from (git ref)
-- **target**: Where to merge to (workdir, branch)
-- **build_test**: Validation command, timeout, log storage
-- **llm**: API key, model selection (resolver, summarizer, planner)
-- **imerge**: git-imerge settings
-- **merge**: Strategy options, retry limits
-
-Configuration can be overridden via environment variables (e.g., `SPLINTERCAT__LLM__API_KEY=...`) or command-line arguments (e.g., `--llm.planner_model=...`).
+Large merges get broken into small, manageable pieces.
 
 ## Installation
 
+Requires Python 3.12 or later.
+
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
-Python 3.11+ required.
+## Quick start
 
-Dependencies:
-- pydantic, pydantic-settings (configuration)
-- pydantic-ai[pydantic-graph] (LLM orchestration and workflow)
-- git-imerge (merge subdivision)
+Create a `config.yaml` file:
 
-## Usage
+```yaml
+config:
+  git:
+    source_ref: upstream/main
+    target_workdir: /path/to/your/repo
+    target_branch: your-branch
+    imerge_name: upstream-merge
 
-(To be implemented)
+  build:
+    command: make test
+    output_dir: .splintercat/logs
+
+  llm:
+    api_key: ${OPENROUTER_API_KEY}
+    base_url: https://openrouter.ai/api/v1
+    resolver_model: openai/gpt-4o-mini
+    planner_model: anthropic/claude-sonnet-4
+```
+
+Set your API key:
 
 ```bash
 export OPENROUTER_API_KEY=your-key-here
-python main.py
 ```
 
-The workflow will:
-1. Initialize git-imerge merge
-2. Planner chooses merge strategy
-3. Resolve conflicts with LLM
-4. Validate with build/test
-5. On failure: analyze, recover, retry
-6. Produce final single merge commit
+Run the merge:
 
-All decisions and actions are logged to console and `splintercat.log`.
+```bash
+python main.py merge
+```
+
+The system will resolve conflicts, run your tests, and handle failures automatically. Check `splintercat.log` for detailed progress.
+
+## Configuration
+
+The `config.yaml` file controls everything.
+
+Key settings:
+
+- `config.git.source_ref`: What branch to merge from
+- `config.git.target_branch`: What branch to merge into
+- `config.build.command`: Your build/test command
+- `config.llm.api_key`: OpenRouter or OpenAI API key
+- `config.llm.resolver_model`: Fast, cheap model for conflict resolution
+- `config.llm.planner_model`: Smart model for strategy decisions
+
+You can override any setting via environment variables (use `SPLINTERCAT__CONFIG__GIT__SOURCE_REF` format) or command-line arguments (`--config.git.source_ref=value`).
+
+## Current status
+
+Core architecture is complete. LLM integration and workflow nodes are still being implemented.
+
+See [doc/todo.md](doc/todo.md) for implementation status.
 
 ## Documentation
 
-- [doc/design.md](doc/design.md) - Complete architecture and design
-- [doc/llm.md](doc/llm.md) - Instructions for LLM assistants working on this codebase
-- [doc/merge-resolver.md](doc/merge-resolver.md) - Tool-based conflict resolution architecture
-- [doc/gitimerge.py](doc/gitimerge.py) - Reference copy of git-imerge source for understanding the library
+- [doc/design.md](doc/design.md) - Architecture and design rationale
+- [doc/todo.md](doc/todo.md) - Implementation roadmap
+- [doc/merge-resolver.md](doc/merge-resolver.md) - How conflict resolution works
+- [doc/llm.md](doc/llm.md) - Guidelines for contributors
 
-## Development
+## Why this exists
 
-See [doc/llm.md](doc/llm.md) for development guidelines.
+Large projects like LLVM require frequent merges of thousands of upstream commits.
 
-Key points:
-- Virtual environment: `source ../.venv/bin/activate`
-- No emojis anywhere
-- No code blocks in markdown documentation
-- design.md is the source of truth for architecture
-- Don't implement until needed for real-world merge cases
+Doing this manually is slow and error-prone. When builds fail after merging, isolating the problematic conflict resolution is nearly impossible with traditional tools.
 
-## Why This Exists
-
-Large upstream repositories (like LLVM) require frequent merging of thousands of commits. Manual conflict resolution is tedious and error-prone. Build failures may indicate incorrect conflict resolutions, requiring careful analysis and retry.
-
-Splintercat automates this process while maintaining the ability to recover intelligently from failures, producing a clean merge that preserves history and passes all tests.
+Splintercat automates the entire workflow while maintaining the ability to recover from failures intelligently.
