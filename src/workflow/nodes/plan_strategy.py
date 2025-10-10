@@ -1,15 +1,26 @@
 """PlanStrategy node - planner chooses merge strategy."""
 
+from __future__ import annotations
+from dataclasses import dataclass
+
+from pydantic_graph import BaseNode, GraphRunContext
+
 from src.state.workflow import MergeWorkflowState
 
 
-def plan_strategy(state: MergeWorkflowState) -> MergeWorkflowState:
-    """Planner chooses initial merge strategy and parameters.
+@dataclass
+class PlanStrategy(BaseNode[MergeWorkflowState]):
+    """Planner chooses initial merge strategy and parameters."""
 
-    Args:
-        state: Current workflow state
+    async def run(
+        self, ctx: GraphRunContext[MergeWorkflowState]
+    ) -> "ResolveConflicts":
+        """Choose merge strategy and create strategy instance.
 
-    Returns:
-        Updated workflow state with chosen strategy
-    """
-    pass
+        Returns:
+            ResolveConflicts: Next node to start conflict resolution
+        """
+        # TODO: Implement strategy planning logic
+        # For now, just return next node
+        from src.workflow.nodes.resolve_conflicts import ResolveConflicts
+        return ResolveConflicts()

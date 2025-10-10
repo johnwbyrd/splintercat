@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Splintercat - Model-assisted git merge conflict resolution."""
 
+import asyncio
 import sys
 
 from src.app import SplintercatApp
@@ -11,7 +12,7 @@ def main():
     """Main entry point."""
     settings = Settings()
     app = SplintercatApp(settings)
-    sys.exit(app.run())
+    sys.exit(asyncio.run(app.run()))
 
 
 if __name__ == "__main__":

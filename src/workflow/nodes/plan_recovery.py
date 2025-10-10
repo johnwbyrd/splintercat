@@ -1,21 +1,27 @@
 """PlanRecovery node - planner analyzes failure and decides next steps."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from pydantic_graph import BaseNode, GraphRunContext
+
 from src.state.workflow import MergeWorkflowState
 
 
-def plan_recovery(state: MergeWorkflowState) -> MergeWorkflowState:
-    """Planner analyzes failure and returns routing decision.
+@dataclass
+class PlanRecovery(BaseNode[MergeWorkflowState]):
+    """Planner analyzes failure and decides next recovery strategy."""
 
-    Returns decision about next action:
-    - retry (retry-all or retry-specific)
-    - bisect
-    - switch-strategy
-    - abort
+    async def run(
+        self, ctx: GraphRunContext[MergeWorkflowState]
+    ) -> ExecuteRecovery:
+        """Analyze failure and decide recovery approach.
 
-    Args:
-        state: Current workflow state
+        Returns:
+            ExecuteRecovery: Next node to execute recovery strategy
+        """
+        pass
 
-    Returns:
-        Updated workflow state with recovery decision
-    """
-    pass
+# Backward compatibility
+plan_recovery = PlanRecovery

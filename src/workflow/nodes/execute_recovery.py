@@ -1,18 +1,27 @@
 """ExecuteRecovery node - apply recovery strategy based on planner decision."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from pydantic_graph import BaseNode, GraphRunContext
+
 from src.state.workflow import MergeWorkflowState
 
 
-def execute_recovery(state: MergeWorkflowState) -> MergeWorkflowState:
-    """Execute recovery strategy based on planner's decision.
+@dataclass
+class ExecuteRecovery(BaseNode[MergeWorkflowState]):
+    """Apply recovery strategy based on planner's decision."""
 
-    Uses recovery classes (retry_all, retry_specific, bisect, switch_strategy)
-    to apply the chosen recovery approach.
+    async def run(
+        self, ctx: GraphRunContext[MergeWorkflowState]
+    ) -> ResolveConflicts:
+        """Execute chosen recovery strategy and resume workflow.
 
-    Args:
-        state: Current workflow state
+        Returns:
+            ResolveConflicts: Resume conflict resolution after recovery
+        """
+        pass
 
-    Returns:
-        Updated workflow state with recovery applied
-    """
-    pass
+# Backward compatibility
+execute_recovery = ExecuteRecovery

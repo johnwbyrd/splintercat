@@ -2,6 +2,7 @@
 
 from src.core.config import Settings
 from src.core.log import logger
+from src.state.workflow import MergeWorkflowState
 from src.workflow.graph import create_workflow
 
 
@@ -17,8 +18,8 @@ class SplintercatApp:
         self.settings = settings
         logger.setup(settings.verbose)
 
-    def run(self) -> int:
-        """Run the merge workflow.
+    async def run(self) -> int:
+        """Run the merge workflow asynchronously.
 
         Returns:
             Exit code: 0 for success, 1 for failure
@@ -28,18 +29,26 @@ class SplintercatApp:
             f"into {self.settings.target.branch}"
         )
 
-        # Create and run workflow
+        # Create workflow
         workflow = create_workflow(self.settings)
-        final_state = workflow.invoke(self._create_initial_state())
+        initial_state = MergeWorkflowState(**self._create_initial_state())
+
+        from src.workflow.nodes.initialize import Initialize
+
+        # Execute workflow with pydantic-graph API
+        async with workflow.iter(Initialize(), state=initial_state) as run:
+            end_result = None
+            async for node in run:
+                if hasattr(node, 'data'):  # End node
+                    end_result = node.data
+                    break
 
         # Report results
-        if final_state.get("status") == "complete":
-            logger.success(f"Merge complete! Final commit: {final_state['final_commit']}")
+        if isinstance(end_result, str):  # Successfully reached End node with commit SHA
+            logger.info(f"Merge complete! Final commit: {end_result}")
             return 0
         else:
             logger.error("Merge failed")
-            if final_state.get("failure_summary"):
-                logger.error(f"Last failure: {final_state['failure_summary'].root_cause}")
             return 1
 
     def _create_initial_state(self) -> dict:
