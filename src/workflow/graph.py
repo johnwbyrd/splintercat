@@ -15,7 +15,7 @@ def create_workflow():
     logger.debug("Building workflow graph")
 
     # Import nodes (lazy to avoid circular imports)
-    from src.workflow.nodes.build_test import Build, Tests
+    from src.workflow.nodes.check import Check
     from src.workflow.nodes.execute_recovery import ExecuteRecovery
     from src.workflow.nodes.finalize import Finalize
     from src.workflow.nodes.initialize import Initialize
@@ -30,8 +30,7 @@ def create_workflow():
             Initialize,
             PlanStrategy,
             ResolveConflicts,
-            Build,
-            Tests,
+            Check,
             SummarizeFailure,
             PlanRecovery,
             ExecuteRecovery,

@@ -17,14 +17,14 @@ class Strategy(Protocol):
         pass
 
     @abstractmethod
-    def should_build_now(self, conflicts_resolved_this_batch: int) -> bool:
-        """Determine if we should build/test now.
+    def should_check_now(self, conflicts_resolved_this_batch: int) -> bool:
+        """Determine if we should run checks now.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved since last build
+            conflicts_resolved_this_batch: Number of conflicts resolved since last check
 
         Returns:
-            True if should run build/test now, False to continue resolving
+            True if should run checks now, False to continue resolving
         """
         pass
 

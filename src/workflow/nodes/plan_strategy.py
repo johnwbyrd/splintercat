@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pydantic_graph import BaseNode, GraphRunContext
 
 from src.core.config import State
+from src.core.log import logger
 
 
 @dataclass
@@ -21,6 +22,7 @@ class PlanStrategy(BaseNode[State]):
         Returns:
             ResolveConflicts: Next node to start conflict resolution
         """
+        logger.info("PlanStrategy node - stub implementation")
         # TODO: Implement strategy planning logic
         # For now, just return next node
         from src.workflow.nodes.resolve_conflicts import ResolveConflicts

@@ -1,26 +1,29 @@
-"""Build log summarizer model."""
+"""Check log summarizer model."""
 
 from pathlib import Path
 
 
-class BuildFailureSummary:
-    """Structured summary of a build failure."""
+class CheckFailureSummary:
+    """Structured summary of a check failure."""
 
     def __init__(
         self,
+        check_name: str,
         error_type: str,
         location: str,
         root_cause: str,
         excerpt: str,
     ):
-        """Initialize build failure summary.
+        """Initialize check failure summary.
 
         Args:
+            check_name: Name of check that failed
             error_type: Type of error (compile_error, link_error, test_failure, timeout)
             location: File:line or test name where error occurred
             root_cause: One-sentence description of root cause
             excerpt: Relevant error message excerpt
         """
+        self.check_name = check_name
         self.error_type = error_type
         self.location = location
         self.root_cause = root_cause
@@ -28,7 +31,7 @@ class BuildFailureSummary:
 
 
 class Summarizer:
-    """LLM model for summarizing build/test logs.
+    """LLM model for summarizing check logs.
 
     Uses a cheap/fast model to extract actionable error information from verbose logs.
     """
@@ -43,11 +46,11 @@ class Summarizer:
         """
         pass
 
-    def summarize_failure(self, log_file: Path) -> BuildFailureSummary:
-        """Summarize a build/test failure from log file.
+    def summarize_failure(self, log_file: Path) -> CheckFailureSummary:
+        """Summarize a check failure from log file.
 
         Args:
-            log_file: Path to build/test log file
+            log_file: Path to check log file
 
         Returns:
             Structured summary of the failure

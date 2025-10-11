@@ -1,18 +1,18 @@
-"""Batch strategy: resolve N conflicts, test, repeat."""
+"""Batch strategy: resolve N conflicts, check, repeat."""
 
 
 class BatchStrategy:
-    """Batch strategy - resolve N conflicts, then build/test.
+    """Batch strategy - resolve N conflicts, then check.
 
     Balanced approach.
-    Reasonable isolation with fewer builds than per-conflict.
+    Reasonable isolation with fewer checks than per-conflict.
     """
 
     def __init__(self, batch_size: int):
         """Initialize batch strategy.
 
         Args:
-            batch_size: Number of conflicts to resolve before building
+            batch_size: Number of conflicts to resolve before checking
         """
         self.batch_size = batch_size
 
@@ -21,11 +21,11 @@ class BatchStrategy:
         """Strategy name."""
         return "batch"
 
-    def should_build_now(self, conflicts_resolved_this_batch: int) -> bool:
-        """Build after N conflicts resolved.
+    def should_check_now(self, conflicts_resolved_this_batch: int) -> bool:
+        """Check after N conflicts resolved.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved since last build
+            conflicts_resolved_this_batch: Number of conflicts resolved since last check
 
         Returns:
             True if batch size reached, False otherwise

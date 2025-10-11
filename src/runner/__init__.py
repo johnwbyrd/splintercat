@@ -1,7 +1,7 @@
-"""Build and test execution."""
+"""Check execution."""
 
-from src.runner.build import BuildRunner
+from src.runner.check import CheckRunner
 
 __all__ = [
-    "BuildRunner",
+    "CheckRunner",
 ]

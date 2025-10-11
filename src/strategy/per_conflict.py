@@ -1,11 +1,11 @@
-"""Per-conflict strategy: resolve one conflict, test, repeat."""
+"""Per-conflict strategy: resolve one conflict, check, repeat."""
 
 
 class PerConflictStrategy:
-    """Per-conflict strategy - resolve one conflict, then build/test immediately.
+    """Per-conflict strategy - resolve one conflict, then check immediately.
 
     Best isolation of failures.
-    Slowest (most builds).
+    Slowest (most checks).
     Safest approach.
     """
 
@@ -14,11 +14,11 @@ class PerConflictStrategy:
         """Strategy name."""
         return "per_conflict"
 
-    def should_build_now(self, conflicts_resolved_this_batch: int) -> bool:
-        """Build after every conflict.
+    def should_check_now(self, conflicts_resolved_this_batch: int) -> bool:
+        """Check after every conflict.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved since last build
+            conflicts_resolved_this_batch: Number of conflicts resolved since last check
 
         Returns:
             True if any conflict resolved, False otherwise

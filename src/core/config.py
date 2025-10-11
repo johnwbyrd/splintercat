@@ -51,11 +51,11 @@ class GitConfig(BaseConfig):
     imerge_goal: str = "merge"
 
 
-class BuildConfig(BaseConfig):
-    """Build and test execution configuration."""
-    command: str
+class CheckConfig(BaseConfig):
+    """Check execution configuration."""
     output_dir: Path
-    timeout: int = 14400  # 4 hours in seconds
+    default_timeout: int = 3600
+    commands: dict[str, str] = Field(default_factory=dict)
 
 
 class LLMConfig(BaseConfig):
@@ -84,7 +84,7 @@ class Config(BaseModel):
     it's the container, not a section.
     """
     git: GitConfig
-    build: BuildConfig
+    check: CheckConfig
     llm: LLMConfig
     strategy: StrategyConfig
     verbose: bool = False
@@ -112,6 +112,8 @@ class MergeState(BaseState):
     attempts: list = Field(default_factory=list)
     resolutions: list = Field(default_factory=list)
     current_strategy: str = ""
+    check_results: list = Field(default_factory=list)
+    last_failed_check: Any = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -205,17 +207,12 @@ class State(BaseSettings):
         be replaced with the actual value from the state.
 
         This allows config values to reference other config values,
-        e.g., build.output_dir can reference git.target_workdir.
+        e.g., check.output_dir can reference git.target_workdir.
         """
-        # Substitute in build command
-        self.config.build.command = self._substitute_string(
-            self.config.build.command
-        )
-
-        # Substitute in build output_dir
-        output_dir_str = str(self.config.build.output_dir)
+        # Substitute in check output_dir
+        output_dir_str = str(self.config.check.output_dir)
         output_dir_substituted = self._substitute_string(output_dir_str)
-        self.config.build.output_dir = Path(output_dir_substituted)
+        self.config.check.output_dir = Path(output_dir_substituted)
 
         return self
 
