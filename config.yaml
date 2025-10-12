@@ -24,20 +24,23 @@ config:
     imerge_goal: merge
 
   # ==============================================================================
-  # BUILD - Build and test validation configuration
+  # CHECK - Validation check configuration
   # ==============================================================================
-  build:
-    # Command to run for build/test validation
-    # Runs after conflict resolution to verify correctness
+  check:
+    # Directory for storing check log files (one timestamped file per check)
     # Template {config.git.target_workdir} is replaced with actual value
-    command: "cd {config.git.target_workdir}/build && ninja check-llvm"
+    output_dir: "{config.git.target_workdir}/.splintercat/check-logs"
 
-    # Directory for storing build/test log files (one timestamped file per attempt)
-    # Template {config.git.target_workdir} is replaced with actual value
-    output_dir: "{config.git.target_workdir}/.splintercat/build-logs"
+    # Default timeout for checks (seconds) - can be overridden per check
+    default_timeout: 14400  # 4 hours
 
-    # Maximum time allowed for build/test (seconds)
-    timeout: 14400  # 4 hours
+    # User-defined checks - add as many as you want with any names
+    commands:
+      # Quick syntax check (fast)
+      quick: "cd {config.git.target_workdir}/build && ninja -n"
+
+      # Full build and test (thorough)
+      normal: "cd {config.git.target_workdir}/build && ninja check-llvm"
 
   # ==============================================================================
   # LLM - Language model configuration

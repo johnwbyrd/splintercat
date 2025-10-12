@@ -45,7 +45,7 @@ class Initialize(BaseNode[State]):
                 raise ValueError(
                     f"git-imerge name '{imerge_name}' is already in use. "
                     f"Change 'config.git.imerge_name' in config.yaml, "
-                    f"or run 'git imerge remove {imerge_name} --force'."
+                    f"or clean up existing state with: python main.py reset --force"
                 ) from e
             else:
                 logger.error(f"Failed to initialize git-imerge merge: {e}")

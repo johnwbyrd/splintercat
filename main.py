@@ -32,6 +32,10 @@ class CliState(State):
 
     def cli_cmd(self):
         """Dispatch to active subcommand, or show help if none provided."""
+        # Setup logging based on verbose flag
+        from src.core.log import logger
+        logger.setup(self.config.verbose)
+
         subcommand = get_subcommand(self, is_required=False)
 
         if subcommand is None:

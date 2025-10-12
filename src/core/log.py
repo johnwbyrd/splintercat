@@ -8,8 +8,11 @@ logger = type('Logger', (), {'__getattr__': lambda self, name: getattr(logfire, 
 
 def setup(verbose: bool = False):
     """Configure logging for splintercat."""
-    # For now, just configure logfire - can add more complex setup later
-    logfire.configure()
+    # Configure logfire with appropriate verbosity
+    # verbose=True shows DEBUG level, False shows INFO level
+    logfire.configure(
+        console={'verbose': verbose}
+    )
 
 
 # Add setup to the wrapper object

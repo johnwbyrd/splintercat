@@ -2,111 +2,131 @@
 
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 
-from pydantic_graph import BaseNode, GraphRunContext
+from pydantic_graph import BaseNode, End, GraphRunContext
 
 from src.core.config import State
 from src.core.log import logger
+from src.core.runner import Runner
 
 
 @dataclass
 class Reset(BaseNode[State]):
     """Reset (discard) all git-imerge state for a merge operation."""
 
-    async def run(self, ctx: GraphRunContext[State]):
-        """Reset all git-imerge state, returning repository to clean state."""
+    async def run(self, ctx: GraphRunContext[State]) -> End[None]:
+        """Reset all git-imerge state, returning repository to clean state.
 
+        Returns:
+            End[None]: Workflow completion with no data
+        """
         workdir = ctx.state.config.git.target_workdir
         force = ctx.state.runtime.reset.force
+        runner = Runner()
 
         # Get existing merge names
-        existing_merges = self._get_existing_merges(workdir)
+        existing_merges = self._get_existing_merges(runner, workdir)
         if not existing_merges:
             logger.warning("No git-imerge merges found to reset")
-            return
+            return End(None)
 
         logger.info(f"Found existing merges: {', '.join(existing_merges)}")
 
-        # Show what will be reset
-        total_refs = 0
-        for merge_name in existing_merges:
-            refs = self._get_merge_refs(workdir, merge_name)
-            total_refs += len(refs)
-            logger.info(f"  {merge_name}: {len(refs)} refs")
-
         # Confirm unless force is set
-        if not force and not await self._confirm_reset(total_refs):
+        if not force and not await self._confirm_reset(len(existing_merges)):
             logger.info("Reset cancelled by user")
-            return
+            return End(None)
 
-        # Perform reset
-        logger.info(f"Resetting {total_refs} refs from {len(existing_merges)} merges...")
-        self._reset_all_merges(workdir, existing_merges)
+        # Perform reset - deletes all imerge refs in one atomic operation
+        self._reset_all_merges(runner, workdir)
 
         # Update state
         ctx.state.runtime.reset.merge_names_found = existing_merges
-        ctx.state.runtime.reset.total_refs_deleted = total_refs
         ctx.state.runtime.reset.status = "complete"
         ctx.state.runtime.merge.current_imerge = None
 
         logger.info("Git repository reset complete - all imerge state discarded")
+        return End(None)
 
-    def _get_existing_merges(self, workdir) -> list[str]:
+    def _get_existing_merges(self, runner: Runner, workdir) -> list[str]:
         """Get list of all existing imerge merge names."""
+        logger.info(f"Looking for imerge refs in: {workdir}")
         try:
-            cmd = ["git", "for-each-ref", "--format=%(refname:short)", "refs/imerge"]
-            result = subprocess.run(
-                cmd, cwd=str(workdir), capture_output=True, text=True, check=True
+            result = runner.execute(
+                "git for-each-ref --format='%(refname:short)' refs/imerge",
+                cwd=workdir,
+                check=True,
             )
-            # Extract unique merge names from refs/imerge/NAME/...
+            logger.debug(f"Git command stdout length: {len(result.stdout)} chars")
+            logger.debug(f"Git command output (first 500 chars): {result.stdout[:500]}")
+
+            # Extract unique merge names from imerge/NAME/...
+            # Note: refname:short format gives "imerge/NAME/..." not "refs/imerge/NAME/..."
             lines = result.stdout.strip().split('\n')
+            logger.debug(f"Found {len(lines)} ref lines")
+
             names = set()
             for line in lines:
-                if line.startswith('refs/imerge/'):
-                    # Format: refs/imerge/NAME/...
+                if line.startswith('imerge/'):
+                    # Format: imerge/NAME/...
                     parts = line.split('/')
-                    if len(parts) >= 3:
-                        names.add(parts[2])
+                    if len(parts) >= 2:
+                        names.add(parts[1])
+
+            logger.info(f"Found {len(names)} unique merge names: {sorted(names)}")
             return sorted(names)
-        except subprocess.CalledProcessError:
+        except Exception as e:
+            logger.error(f"Failed to get existing merges: {e}")
             return []
 
-    def _get_merge_refs(self, workdir, merge_name: str) -> list[str]:
+    def _get_merge_refs(self, runner: Runner, workdir, merge_name: str) -> list[str]:
         """Get all refs for a specific merge."""
+        logger.debug(f"Getting refs for merge: {merge_name}")
         try:
-            cmd = ["git", "for-each-ref", "--format=%(refname)", f"refs/imerge/{merge_name}/**"]
-            result = subprocess.run(
-                cmd, cwd=str(workdir), capture_output=True, text=True, check=True
+            # Use prefix matching, not glob - git for-each-ref matches all refs with this prefix
+            result = runner.execute(
+                f"git for-each-ref --format='%(refname)' refs/imerge/{merge_name}/",
+                cwd=workdir,
+                check=True,
             )
-            return [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
-        except subprocess.CalledProcessError:
+            refs = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+            logger.debug(f"Found {len(refs)} refs for {merge_name}")
+            return refs
+        except Exception as e:
+            logger.error(f"Failed to get refs for {merge_name}: {e}")
             return []
 
-    async def _confirm_reset(self, total_refs: int) -> bool:
+    async def _confirm_reset(self, num_merges: int) -> bool:
         """Get user confirmation for reset operation."""
         # TODO: Implement interactive confirmation
         # For now, show warning and assume cancelled for safety
         logger.warning("Interactive confirmation not implemented - reset cancelled for safety")
-        logger.warning("Use 'splintercat reset --force' to force reset without confirmation")
+        logger.warning(f"Would delete all refs from {num_merges} imerge merge(s)")
+        logger.warning(
+            "Use 'python main.py reset --force true' to force reset without confirmation"
+        )
         return False
 
-    def _reset_all_merges(self, workdir, merge_names: list[str]):
-        """Reset all imerge state by deleting all refs."""
-        all_refs = []
-        for merge_name in merge_names:
-            refs = self._get_merge_refs(workdir, merge_name)
-            all_refs.extend(refs)
+    def _reset_all_merges(self, runner: Runner, workdir):
+        """Reset all imerge state by deleting all refs.
 
-        if not all_refs:
-            return
+        Uses git pipeline approach from Stack Overflow:
+        https://stackoverflow.com/questions/46229291/in-git-how-can-i-efficiently-delete-all-refs-matching-a-pattern
 
-        # Use git update-ref --stdin for efficient bulk deletion
-        delete_commands = [f"delete {ref}" for ref in all_refs]
-        input_data = '\n'.join(delete_commands) + '\n'
+        The command 'git for-each-ref --format="delete %(refname)" refs/imerge/'
+        generates delete commands for each ref, which are piped to
+        'git update-ref --stdin' for atomic bulk deletion.
+        """
+        logger.info("Deleting all imerge refs via git pipeline")
 
-        cmd = ["git", "update-ref", "--stdin"]
-        subprocess.run(cmd, cwd=str(workdir), input=input_data, text=True, check=True)
+        # Single pipeline command to delete all imerge refs atomically
+        # format='delete %(refname)' generates: delete refs/imerge/name/path
+        # These are piped to update-ref --stdin which executes all deletions together
+        runner.execute(
+            "git for-each-ref --format='delete %(refname)' refs/imerge/ | git update-ref --stdin",
+            cwd=workdir,
+            check=True,
+        )
 
-        logger.info(f"Deleted {len(all_refs)} imerge refs")
+        logger.info("Successfully deleted all imerge refs")

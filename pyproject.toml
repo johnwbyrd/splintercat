@@ -24,6 +24,7 @@ dependencies = [
     "pydantic-settings>=2.0",
     "pydantic-ai[pydantic-graph]>=1.0.0",
     "git-imerge>=1.2.0",
+    "invoke>=2.0.0",
 ]
 
 [project.scripts]

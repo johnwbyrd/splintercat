@@ -1,11 +1,10 @@
 """Check runner with log management."""
 
-import os
 from datetime import datetime
 from pathlib import Path
 
-from src.core.command_runner import CommandRunner
 from src.core.result import CheckResult
+from src.core.runner import Runner
 
 
 class CheckRunner:
@@ -20,7 +19,7 @@ class CheckRunner:
         """
         self.workdir = workdir
         self.output_dir = output_dir
-        self.runner = CommandRunner()
+        self.runner = Runner()
 
     def run(self, check_name: str, command: str, timeout: int) -> CheckResult:
         """Run check command and save output to timestamped log file.
@@ -40,24 +39,20 @@ class CheckRunner:
         # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Change to workdir and run command
-        original_dir = os.getcwd()
-        try:
-            os.chdir(str(self.workdir))
-            result = self.runner.run(
-                command,
-                check=False,
-                log_level="DEBUG",
-                timeout=timeout,
-                log_file=log_file,
-            )
-        finally:
-            os.chdir(original_dir)
+        # Run command with new Runner
+        result = self.runner.execute(
+            command,
+            cwd=self.workdir,
+            timeout=timeout,
+            log_file=log_file,
+            log_level="DEBUG",
+            check=False,  # Don't raise exception on failure
+        )
 
         return CheckResult(
             check_name=check_name,
-            success=(result.returncode == 0),
+            success=(result.exited == 0),
             log_file=log_file,
-            returncode=result.returncode,
+            returncode=result.exited,
             timestamp=timestamp,
         )
