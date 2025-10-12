@@ -164,7 +164,8 @@ def test_defaults_lowest_priority(fixtures_dir):
 
     # But defaults still present for non-overridden values
     assert "available" in data["config"]["strategy"]
-    assert data["config"]["strategy"]["available"] == ["optimistic", "batch", "per_conflict"]
+    expected = ["optimistic", "batch", "per_conflict"]
+    assert data["config"]["strategy"]["available"] == expected
 
 
 def test_list_replacement_not_merge(fixtures_dir):

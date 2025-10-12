@@ -48,7 +48,8 @@ def test_nested_includes(fixtures_dir):
     source = YamlWithIncludesSettingsSource(State, yaml_file=str(yaml_file))
     data = source()
 
-    # Should have loaded: nested_include -> with_include -> extra_commands
+    # Should have loaded:
+    # nested_include -> with_include -> extra_commands
     assert "custom" in data["config"]["commands"]
     assert data["config"]["git"]["source_ref"] == "nested/branch"
 
@@ -59,9 +60,10 @@ def test_include_with_relative_path(fixtures_dir, tmp_path):
     subdir = tmp_path / "subdir"
     subdir.mkdir()
 
-    # Create a config in subdir that includes ../fixtures/extra_commands.yaml
+    # Create a config in subdir that includes
+    # ../fixtures/extra_commands.yaml
     config_file = subdir / "config.yaml"
-    config_file.write_text(f"""
+    config_file.write_text("""
 include: ../fixtures/extra_commands.yaml
 
 config:

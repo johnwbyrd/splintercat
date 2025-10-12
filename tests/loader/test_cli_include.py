@@ -25,13 +25,20 @@ def mock_argv():
 def test_single_cli_include(fixtures_dir, mock_argv, monkeypatch):
     """Single --include arg loads additional file."""
     # Set up sys.argv
-    sys.argv = ["prog", "--include", str(fixtures_dir / "override_strategy.yaml")]
+    sys.argv = [
+        "prog",
+        "--include",
+        str(fixtures_dir / "override_strategy.yaml"),
+    ]
 
     # Need a base config.yaml - use minimal fixture
     monkeypatch.setenv("PWD", str(fixtures_dir))
 
-    # Load with defaults + minimal.yaml as config + override via --include
-    from splintercat.core.yaml_settings import YamlWithIncludesSettingsSource
+    # Load with defaults + minimal.yaml as config + override
+    # via --include
+    from splintercat.core.yaml_settings import (
+        YamlWithIncludesSettingsSource,
+    )
 
     source = YamlWithIncludesSettingsSource(
         State,
@@ -130,13 +137,16 @@ def test_cli_include_field_populated(fixtures_dir, mock_argv):
 
     # Create full State (not just settings source)
     # Need to mock this carefully since State expects real config
-    from splintercat.core.yaml_settings import YamlWithIncludesSettingsSource
+    from splintercat.core.yaml_settings import (
+        YamlWithIncludesSettingsSource,
+    )
 
-    source = YamlWithIncludesSettingsSource(
+    YamlWithIncludesSettingsSource(
         State,
         yaml_file=str(fixtures_dir / "minimal.yaml")
     )
 
-    # The source stores includes for loading but State.include comes from CLI parsing
-    # This test verifies the mechanism, actual field test would need full State init
+    # The source stores includes for loading but State.include
+    # comes from CLI parsing. This test verifies the mechanism,
+    # actual field test would need full State init
     assert len([a for a in sys.argv if a == "--include"]) == 2

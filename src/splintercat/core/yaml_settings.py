@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any
 
 import yaml
 from platformdirs import user_config_dir
@@ -14,10 +13,13 @@ from splintercat.core.log import logger
 
 
 class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
-    """YAML settings source with include: directive and --include CLI support.
+    """YAML settings source with include: directive and --include
+    CLI support.
 
-    Automatically loads package defaults from defaults/default.yaml.
-    Checks for user and project config files in platform-specific locations.
+    Automatically loads package defaults from
+    defaults/default.yaml.
+    Checks for user and project config files in
+    platform-specific locations.
     Processes include: directives recursively within YAML files.
     Supports --include CLI args to load additional files.
     Deep merges all sources:

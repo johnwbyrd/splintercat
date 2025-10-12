@@ -26,7 +26,7 @@ def test_circular_include_detected(fixtures_dir):
 def test_missing_include_file_raises_error(fixtures_dir, tmp_path):
     """Missing include file raises FileNotFoundError."""
     config_file = tmp_path / "config.yaml"
-    config_file.write_text(f"""
+    config_file.write_text("""
 include: nonexistent.yaml
 
 config:
@@ -96,7 +96,7 @@ random_key: random_value
 """)
 
     config_file = tmp_path / "config.yaml"
-    config_file.write_text(f"""
+    content = f"""
 include: {partial_file}
 
 config:
@@ -117,7 +117,8 @@ config:
     resolver_model: test/model
     summarizer_model: test/model
     planner_model: test/model
-""")
+"""
+    config_file.write_text(content)
 
     source = YamlWithIncludesSettingsSource(State, yaml_file=str(config_file))
     data = source()
@@ -132,7 +133,7 @@ def test_absolute_include_path(fixtures_dir, tmp_path):
     absolute_path = (fixtures_dir / "extra_commands.yaml").resolve()
 
     config_file = tmp_path / "config.yaml"
-    config_file.write_text(f"""
+    content = f"""
 include: {absolute_path}
 
 config:
@@ -153,7 +154,8 @@ config:
     resolver_model: test/model
     summarizer_model: test/model
     planner_model: test/model
-""")
+"""
+    config_file.write_text(content)
 
     source = YamlWithIncludesSettingsSource(State, yaml_file=str(config_file))
     data = source()
