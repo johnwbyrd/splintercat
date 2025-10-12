@@ -38,7 +38,7 @@ After installation, the `splintercat` command will be available in your PATH.
 
 ## Quick start
 
-Create a `config.yaml` file:
+Create a `splintercat.yaml` file in your project directory:
 
 ```yaml
 config:
@@ -48,21 +48,28 @@ config:
     target_branch: your-branch
     imerge_name: upstream-merge
 
-  build:
-    command: make test
+  check:
+    commands:
+      quick: make test
     output_dir: .splintercat/logs
 
   llm:
-    api_key: ${OPENROUTER_API_KEY}
     base_url: https://openrouter.ai/api/v1
     resolver_model: openai/gpt-4o-mini
     planner_model: anthropic/claude-sonnet-4
+    summarizer_model: openai/gpt-4o-mini
 ```
 
-Set your API key:
+Create a `.env` file for your API key:
+
+```
+SPLINTERCAT_CONFIG__LLM__API_KEY=your-key-here
+```
+
+Or set it as an environment variable:
 
 ```bash
-export OPENROUTER_API_KEY=your-key-here
+export SPLINTERCAT_CONFIG__LLM__API_KEY=your-key-here
 ```
 
 Run the merge:
@@ -75,18 +82,27 @@ The system will resolve conflicts, run your tests, and handle failures automatic
 
 ## Configuration
 
-The `config.yaml` file controls everything.
+Splintercat loads configuration from multiple locations:
+
+1. **Package defaults** - Built-in sensible defaults
+2. **User config** - Your personal settings (LLM models, preferences)
+   - Linux: `~/.config/splintercat/splintercat.yaml`
+   - macOS: `~/Library/Application Support/splintercat/splintercat.yaml`
+   - Windows: `%LOCALAPPDATA%\splintercat\splintercat.yaml`
+3. **Project config** - Project-specific settings (`./splintercat.yaml`)
+4. **Environment variables** - Secrets and overrides (`SPLINTERCAT_CONFIG__SECTION__KEY`)
+5. **CLI arguments** - One-off changes (`--config.git.source_ref=value`)
 
 Key settings:
 
 - `config.git.source_ref`: What branch to merge from
 - `config.git.target_branch`: What branch to merge into
-- `config.build.command`: Your build/test command
-- `config.llm.api_key`: OpenRouter or OpenAI API key
+- `config.check.commands`: Your build/test commands
+- `config.llm.api_key`: OpenRouter or OpenAI API key (set via environment variable)
 - `config.llm.resolver_model`: Fast, cheap model for conflict resolution
 - `config.llm.planner_model`: Smart model for strategy decisions
 
-You can override any setting via environment variables (use `SPLINTERCAT__CONFIG__GIT__SOURCE_REF` format) or command-line arguments (`--config.git.source_ref=value`).
+See [docs/configuration.md](docs/configuration.md) for complete details.
 
 ## Current status
 

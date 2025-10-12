@@ -7,16 +7,21 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from platformdirs import user_config_dir
 from pydantic_settings import BaseSettings, YamlConfigSettingsSource
+
+from splintercat.core.log import logger
 
 
 class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
     """YAML settings source with include: directive and --include CLI support.
 
     Automatically loads package defaults from defaults/default.yaml.
+    Checks for user and project config files in platform-specific locations.
     Processes include: directives recursively within YAML files.
     Supports --include CLI args to load additional files.
-    Deep merges all sources: defaults < config.yaml < CLI includes.
+    Deep merges all sources:
+        defaults < user config < project config < CLI includes.
     """
 
     def __init__(
@@ -53,32 +58,62 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
         super().__init__(settings_cls, yaml_file)
 
     def _read_files(self, files):
-        """Load defaults, user config, and CLI includes with deep merge.
+        """Load defaults, user config, project config, and CLI includes.
+
+        Loads configuration from multiple locations in priority order:
+        1. Package defaults (defaults/default.yaml) - always loaded
+        2. User config (platform-specific location) - if exists
+        3. Project config (./splintercat.yaml) - if exists
+        4. CLI includes (--include files) - if provided
 
         Args:
-            files: User config file path(s) from yaml_file setting
+            files: CLI include file path(s) from --include arguments
 
         Returns:
             Deep-merged dictionary of all loaded data
         """
-        # Load package defaults
+        result = {}
+
+        # Build list of files to check in priority order
+        files_to_load = []
+
+        # 1. Package defaults (always first)
         default_file = (
             Path(__file__).parent.parent / "defaults" / "default.yaml"
         )
-        result = {}
+        files_to_load.append(default_file)
 
-        if default_file.exists():
-            result = self._load_file_recursive(default_file, set())
+        # 2. User config (platform-specific location)
+        user_config = (
+            Path(user_config_dir("splintercat", appauthor=False))
+            / "splintercat.yaml"
+        )
+        files_to_load.append(user_config)
 
-        # Load user files
+        # 3. Project config (current directory)
+        project_config = Path("splintercat.yaml")
+        files_to_load.append(project_config)
+
+        # 4. CLI includes (highest priority)
         if files:
             if isinstance(files, (str, os.PathLike)):
                 files = [files]
-            for file in files:
-                file_path = Path(file).expanduser()
-                if file_path.is_file():
+            files_to_load.extend(Path(f).expanduser() for f in files)
+
+        # Load and merge all files that exist
+        for file_path in files_to_load:
+            if file_path.is_file():
+                with logger.span(
+                    "Loading configuration",
+                    file=str(file_path),
+                ):
                     data = self._load_file_recursive(file_path, set())
                     result = self._deep_merge(result, data)
+            else:
+                logger.debug(
+                    "Configuration file not found (skipping)",
+                    file=str(file_path),
+                )
 
         return result
 
@@ -112,10 +147,15 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
 
             for inc in includes:
                 inc_path = self._resolve_path(inc, filepath)
-                inc_data = self._load_file_recursive(
-                    inc_path, visited.copy()
-                )
-                data = self._deep_merge(inc_data, data)
+                with logger.span(
+                    f"Including {inc_path.name}",
+                    included_from=str(filepath),
+                    include_file=str(inc_path),
+                ):
+                    inc_data = self._load_file_recursive(
+                        inc_path, visited.copy()
+                    )
+                    data = self._deep_merge(inc_data, data)
 
         return data
 
