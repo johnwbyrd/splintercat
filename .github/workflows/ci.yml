@@ -29,4 +29,8 @@ jobs:
         run: ruff check
 
       - name: Run tests
-        run: pytest -v
+        uses: quantco/pytest-action@v2
+        with:
+          report-title: "Test Results (Python ${{ matrix.python-version }})"
+          emoji: true
+          job-summary: true
