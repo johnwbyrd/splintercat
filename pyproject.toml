@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.scripts]
-splintercat = "main:main"
+splintercat = "splintercat.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -41,8 +41,11 @@ Repository = "https://github.com/johnwbyrd/splintercat"
 Issues = "https://github.com/johnwbyrd/splintercat/issues"
 
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=69.0.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 # PEP 8: 79 characters for code

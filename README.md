@@ -28,11 +28,13 @@ Large merges get broken into small, manageable pieces.
 
 ## Installation
 
-Requires Python 3.12 or later.
+Requires Python 3.11 or later.
 
 ```bash
 pip install -e .
 ```
+
+After installation, the `splintercat` command will be available in your PATH.
 
 ## Quick start
 
@@ -66,7 +68,7 @@ export OPENROUTER_API_KEY=your-key-here
 Run the merge:
 
 ```bash
-python main.py merge
+splintercat merge
 ```
 
 The system will resolve conflicts, run your tests, and handle failures automatically. Check `splintercat.log` for detailed progress.
@@ -90,14 +92,29 @@ You can override any setting via environment variables (use `SPLINTERCAT__CONFIG
 
 Core architecture is complete. LLM integration and workflow nodes are still being implemented.
 
-See [doc/todo.md](doc/todo.md) for implementation status.
+See [docs/todo.md](docs/todo.md) for implementation status.
+
+## Using as a Library
+
+Splintercat can also be used as a Python library:
+
+```python
+from splintercat.command import MergeCommand
+from splintercat.core import State
+
+# Load configuration
+state = State()
+
+# Run merge programmatically
+await MergeCommand().run_workflow(state)
+```
 
 ## Documentation
 
-- [doc/design.md](doc/design.md) - Architecture and design rationale
-- [doc/todo.md](doc/todo.md) - Implementation roadmap
-- [doc/merge-resolver.md](doc/merge-resolver.md) - How conflict resolution works
-- [doc/llm.md](doc/llm.md) - Guidelines for contributors
+- [docs/design.md](docs/design.md) - Architecture and design rationale
+- [docs/todo.md](docs/todo.md) - Implementation roadmap
+- [docs/merge-resolver.md](docs/merge-resolver.md) - How conflict resolution works
+- [docs/llm.md](docs/llm.md) - Guidelines for contributors
 
 ## Why this exists
 

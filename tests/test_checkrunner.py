@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from src.runner.check import CheckRunner
+from splintercat.runner.check import CheckRunner
 
 
 def test_successful_command():
