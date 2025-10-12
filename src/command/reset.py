@@ -1,18 +1,22 @@
 """Reset command - cleans git-imerge state."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.core.log import logger
 
 
 class ResetCommand(BaseModel):
-    """Clean git-imerge state.
+    """Clean up git-imerge state and abort current merge.
 
-    Parameters:
-        force: Skip confirmation prompt if True
+    Removes all git-imerge refs and state, effectively aborting any
+    in-progress merge operation. This is useful for starting fresh or
+    cleaning up after a failed merge.
     """
 
-    force: bool = False
+    force: bool = Field(
+        default=False,
+        description="Skip confirmation prompt and delete immediately"
+    )
 
     async def run_workflow(self, state: "State") -> int:
         """Run reset workflow.

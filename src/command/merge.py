@@ -6,9 +6,13 @@ from src.core.log import logger
 
 
 class MergeCommand(BaseModel):
-    """Execute merge workflow.
+    """Run LLM-assisted incremental merge with build validation.
 
-    This command has no parameters - it uses configuration from State.
+    Performs git-imerge merge with conflict resolution using LLM models,
+    validates each step with build/test checks, and implements smart
+    recovery strategies when failures occur.
+
+    All configuration comes from config.yaml, .env, or CLI flags.
     """
 
     async def run_workflow(self, state: "State") -> int:

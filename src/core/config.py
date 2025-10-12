@@ -44,36 +44,79 @@ class BaseState(BaseModel):
 
 class GitConfig(BaseConfig):
     """Git repository and merge configuration."""
-    source_ref: str
-    target_workdir: Path
-    target_branch: str
-    imerge_name: str
-    imerge_goal: str = "merge"
+
+    source_ref: str = Field(
+        description="Branch, tag, or commit to merge from (e.g., 'main', 'v1.2.3')"
+    )
+    target_workdir: Path = Field(
+        description="Path to local git repository working directory"
+    )
+    target_branch: str = Field(
+        description="Branch to merge into (e.g., 'stable', 'develop')"
+    )
+    imerge_name: str = Field(description="Unique name for this git-imerge operation")
+    imerge_goal: str = Field(
+        default="merge",
+        description=(
+            "Merge structure: 'merge' (single commit), 'rebase', "
+            "'rebase-with-history', or 'full'"
+        ),
+    )
 
 
 class CheckConfig(BaseConfig):
-    """Check execution configuration."""
-    output_dir: Path
-    default_timeout: int = 3600
-    commands: dict[str, str] = Field(default_factory=dict)
+    """Build and test validation configuration."""
+
+    output_dir: Path = Field(
+        description="Directory for storing check log files (supports {config.*} templates)"
+    )
+    default_timeout: int = Field(
+        default=3600,
+        description="Default timeout for checks in seconds (1 hour = 3600)",
+    )
+    commands: dict[str, str] = Field(
+        default_factory=dict,
+        description="Named check commands (e.g., quick, normal, full)",
+    )
 
 
 class LLMConfig(BaseConfig):
     """LLM provider and model selection."""
-    api_key: str
-    base_url: str
-    resolver_model: str
-    summarizer_model: str
-    planner_model: str
+
+    api_key: str = Field(
+        description=(
+            "API key for LLM provider (best practice: set via .env or environment variable)"
+        )
+    )
+    base_url: str = Field(
+        description="LLM API base URL (e.g., https://openrouter.ai/api/v1)"
+    )
+    resolver_model: str = Field(
+        description="Model for conflict resolution (recommend: cheap/fast model)"
+    )
+    summarizer_model: str = Field(
+        description="Model for build log summarization (recommend: cheap/fast model)"
+    )
+    planner_model: str = Field(
+        description="Model for strategic planning (recommend: smart/expensive model)"
+    )
 
 
 class StrategyConfig(BaseConfig):
     """Merge strategy and recovery configuration."""
-    max_retries: int = 5
-    available: list[str] = Field(
-        default=["optimistic", "batch", "per_conflict"]
+
+    max_retries: int = Field(
+        default=3,
+        description="Maximum number of recovery attempts before aborting",
     )
-    default_batch_size: int = 10
+    available: list[str] = Field(
+        default=["optimistic", "batch", "per_conflict"],
+        description="Available strategies for planner to choose from",
+    )
+    default_batch_size: int = Field(
+        default=10,
+        description="Default batch size for 'batch' strategy",
+    )
 
 
 class Config(BaseModel):
@@ -83,12 +126,26 @@ class Config(BaseModel):
     Note: Config itself doesn't inherit from BaseConfig because
     it's the container, not a section.
     """
-    git: GitConfig
-    check: CheckConfig
-    llm: LLMConfig
-    strategy: StrategyConfig
-    verbose: bool = False
-    interactive: bool = False
+    git: GitConfig = Field(
+        description="Git repository and merge settings"
+    )
+    check: CheckConfig = Field(
+        description="Build and test validation settings"
+    )
+    llm: LLMConfig = Field(
+        description="LLM provider and model settings"
+    )
+    strategy: StrategyConfig = Field(
+        description="Merge strategy and recovery settings"
+    )
+    verbose: bool = Field(
+        default=False,
+        description="Enable verbose debug output",
+    )
+    interactive: bool = Field(
+        default=False,
+        description="Prompt before each command execution",
+    )
 
 
 # ============================================================
@@ -97,37 +154,79 @@ class Config(BaseModel):
 
 class GlobalState(BaseState):
     """Global runtime state shared across all workflows."""
-    current_command: str = ""
+
+    current_command: str = Field(
+        default="",
+        description="Currently executing command (merge, reset, etc.)",
+    )
 
 
 class MergeState(BaseState):
-    """Merge workflow runtime state.
+    """Merge workflow runtime state (mutates during execution)."""
 
-    This tracks the state of the merge workflow as it progresses.
-    """
-    current_imerge: Any = None
-    status: str = "pending"
-    conflicts_remaining: bool = True
-    conflicts_in_batch: list = Field(default_factory=list)
-    attempts: list = Field(default_factory=list)
-    resolutions: list = Field(default_factory=list)
-    current_strategy: str = ""
-    check_results: list = Field(default_factory=list)
-    last_failed_check: Any = None
-    recovery_attempts: int = 0
+    current_imerge: Any = Field(
+        default=None,
+        description="Active git-imerge object",
+    )
+    status: str = Field(
+        default="pending",
+        description="Workflow status: pending, running, complete, failed",
+    )
+    conflicts_remaining: bool = Field(
+        default=True,
+        description="Whether unresolved conflicts remain",
+    )
+    conflicts_in_batch: list = Field(
+        default_factory=list,
+        description="Conflicts in current batch being resolved",
+    )
+    attempts: list = Field(
+        default_factory=list,
+        description="History of resolution attempts",
+    )
+    resolutions: list = Field(
+        default_factory=list,
+        description="History of successful resolutions",
+    )
+    current_strategy: str = Field(
+        default="",
+        description="Active merge strategy: optimistic, batch, or per_conflict",
+    )
+    check_results: list = Field(
+        default_factory=list,
+        description="Results from all check executions",
+    )
+    last_failed_check: Any = Field(
+        default=None,
+        description="Most recent failed check result",
+    )
+    recovery_attempts: int = Field(
+        default=0,
+        description="Number of recovery attempts made so far",
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class ResetState(BaseState):
-    """Reset workflow runtime state.
+    """Reset workflow runtime state (mutates during execution)."""
 
-    This tracks the state of the reset operation.
-    """
-    force: bool = False
-    merge_names_found: list[str] = Field(default_factory=list)
-    total_refs_deleted: int = 0
-    status: str = "pending"
+    force: bool = Field(
+        default=False,
+        description="Whether to skip confirmation prompts",
+    )
+    merge_names_found: list[str] = Field(
+        default_factory=list,
+        description="Git-imerge operations found during cleanup",
+    )
+    total_refs_deleted: int = Field(
+        default=0,
+        description="Number of git refs deleted",
+    )
+    status: str = Field(
+        default="pending",
+        description="Reset status: pending, running, complete",
+    )
 
 
 class Runtime(BaseModel):
@@ -137,9 +236,19 @@ class Runtime(BaseModel):
     Note: Runtime itself doesn't inherit from BaseState because
     it's the container, not a section.
     """
-    global_: GlobalState = Field(default_factory=GlobalState, alias="global")
-    merge: MergeState = Field(default_factory=MergeState)
-    reset: ResetState = Field(default_factory=ResetState)
+    global_: GlobalState = Field(
+        default_factory=GlobalState,
+        alias="global",
+        description="Global state shared across all workflows"
+    )
+    merge: MergeState = Field(
+        default_factory=MergeState,
+        description="Merge workflow runtime state"
+    )
+    reset: ResetState = Field(
+        default_factory=ResetState,
+        description="Reset workflow runtime state"
+    )
 
 
 # ============================================================
@@ -163,14 +272,21 @@ class State(BaseSettings):
     - It validates all data on load
     """
 
-    config: Config
-    runtime: Runtime = Field(default_factory=Runtime)
+    config: Config = Field(
+        description="Application configuration (from YAML/env/CLI)"
+    )
+    runtime: Runtime = Field(
+        default_factory=Runtime,
+        description="Runtime state (mutates during workflow execution)",
+    )
 
     model_config = SettingsConfigDict(
         yaml_file="config.yaml",
         env_file=".env",
         env_nested_delimiter="__",
         cli_parse_args=True,
+        cli_implicit_flags=True,
+        cli_use_class_docs_for_groups=True,
         arbitrary_types_allowed=True,
     )
 
