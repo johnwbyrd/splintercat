@@ -140,7 +140,7 @@ class Reset(BaseNode[State]):
             f"merge(s)"
         )
         logger.warning(
-            "Use 'python main.py reset --force true' to force "
+            "Use 'reset --force' subcommand to force "
             "reset without confirmation"
         )
         return False

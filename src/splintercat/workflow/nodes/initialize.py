@@ -45,9 +45,9 @@ class Initialize(BaseNode[State]):
                 imerge_name = ctx.state.config.git.imerge_name
                 raise ValueError(
                     f"git-imerge name '{imerge_name}' is already in "
-                    f"use. Change 'config.git.imerge_name' in "
-                    f"config.yaml, or clean up existing state with: "
-                    f"python main.py reset --force"
+                    f"use. Change 'config.git.imerge_name' in config.yaml, "
+                    f"or clean up existing state with subcommand: "
+                    "reset --force"
                 ) from e
             else:
                 logger.error(

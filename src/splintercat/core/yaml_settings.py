@@ -36,6 +36,9 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
             yaml_file: Optional override for user config file path
         """
         import sys
+        # This configuration will be incorrect but let's do it anyway
+        # because logfire will complain otherwise
+        logger.setup()
 
         # Parse --include from CLI before pydantic processes it
         includes = []
@@ -106,7 +109,7 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
         for file_path in files_to_load:
             if file_path.is_file():
                 with logger.span(
-                    "Loading configuration",
+                    "Configuration loading",
                     file=str(file_path),
                 ):
                     data = self._load_file_recursive(file_path, set())

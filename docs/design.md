@@ -118,4 +118,4 @@ These might come later, but they're not in the MVP.
 
 ## Success Looks Like
 
-You run `python main.py merge`, go get coffee, and come back to a completed merge with all tests passing. The logs show what the LLMs decided and why. If it failed, the logs explain what went wrong and what recovery strategies were tried.
+You run `splintercat merge`, go get coffee, and come back to a completed merge with all tests passing. The logs show what the LLMs decided and why. If it failed, the logs explain what went wrong and what recovery strategies were tried.
