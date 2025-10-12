@@ -114,6 +114,7 @@ class MergeState(BaseState):
     current_strategy: str = ""
     check_results: list = Field(default_factory=list)
     last_failed_check: Any = None
+    recovery_attempts: int = 0
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -201,20 +202,57 @@ class State(BaseSettings):
 
     @model_validator(mode="after")
     def substitute_templates(self) -> "State":
-        """Substitute template variables in string fields.
+        """Substitute template variables in all string fields recursively.
 
         Supports templates like {config.git.target_workdir} which will
         be replaced with the actual value from the state.
 
-        This allows config values to reference other config values,
-        e.g., check.output_dir can reference git.target_workdir.
+        This recursively walks the entire State object and substitutes
+        templates in strings, Paths, dict values, and list items.
         """
-        # Substitute in check output_dir
-        output_dir_str = str(self.config.check.output_dir)
-        output_dir_substituted = self._substitute_string(output_dir_str)
-        self.config.check.output_dir = Path(output_dir_substituted)
-
+        self._substitute_recursive(self)
         return self
+
+    def _substitute_recursive(self, obj: Any) -> None:
+        """Recursively substitute templates in all string/Path fields.
+
+        Args:
+            obj: Object to process (BaseModel, dict, list, or primitive)
+        """
+        if isinstance(obj, BaseModel):
+            # Process all fields in the model
+            for field_name in obj.__class__.model_fields:
+                value = getattr(obj, field_name)
+                new_value = self._substitute_value(value)
+                if new_value is not value:
+                    setattr(obj, field_name, new_value)
+        elif isinstance(obj, dict):
+            # Process dict values
+            for key in obj:
+                obj[key] = self._substitute_value(obj[key])
+        elif isinstance(obj, list):
+            # Process list items
+            for i in range(len(obj)):
+                obj[i] = self._substitute_value(obj[i])
+
+    def _substitute_value(self, value: Any) -> Any:
+        """Substitute templates in a single value.
+
+        Args:
+            value: Value to process
+
+        Returns:
+            Processed value with templates substituted
+        """
+        if isinstance(value, str):
+            return self._substitute_string(value)
+        elif isinstance(value, Path):
+            return Path(self._substitute_string(str(value)))
+        elif isinstance(value, (BaseModel, dict, list)):
+            self._substitute_recursive(value)
+            return value
+        else:
+            return value
 
     def _substitute_string(self, value: str) -> str:
         """Replace {field.path} templates with actual field values.

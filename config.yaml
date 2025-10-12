@@ -72,7 +72,7 @@ config:
   # ==============================================================================
   strategy:
     # Maximum number of recovery attempts before aborting
-    max_retries: 5
+    max_retries: 3
 
     # Available strategies for Planner to choose from:
     # - optimistic: resolve all conflicts, then test once (fastest, risky)
