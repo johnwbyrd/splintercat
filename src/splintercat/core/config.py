@@ -14,6 +14,135 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
+import yaml
+
+# ============================================================
+# YAML LOADING WITH INCLUDES
+# ============================================================
+
+
+class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
+    """Extends YamlConfigSettingsSource with include: directive support.
+
+    Automatically loads defaults/default.yaml from package, then user's
+    config.yaml. Each file can contain include: directives that are
+    processed recursively with deep merging.
+    """
+
+    def _read_files(self, files):
+        """Override to add default.yaml and include: processing.
+
+        Args:
+            files: User config file path(s) from yaml_file setting
+
+        Returns:
+            Deep-merged dictionary of all loaded data
+        """
+        import os
+
+        # Start with default.yaml from package
+        # __file__ is in src/splintercat/core/config.py
+        # defaults is in src/splintercat/defaults/
+        default_file = (
+            Path(__file__).parent.parent / "defaults" / "default.yaml"
+        )
+
+        result = {}
+
+        # Load and process default.yaml first (with includes)
+        if default_file.exists():
+            result = self._load_file_recursive(default_file, set())
+
+        # Then load user files (if any)
+        if files:
+            if isinstance(files, (str, os.PathLike)):
+                files = [files]
+            for file in files:
+                file_path = Path(file).expanduser()
+                if file_path.is_file():
+                    data = self._load_file_recursive(file_path, set())
+                    result = self._deep_merge(result, data)
+
+        return result
+
+    def _load_file_recursive(
+        self, filepath: Path, visited: set[Path]
+    ) -> dict:
+        """Load file and recursively process includes.
+
+        Args:
+            filepath: Path to YAML file to load
+            visited: Set of already-visited files for cycle detection
+
+        Returns:
+            Dictionary with all includes resolved and merged
+
+        Raises:
+            ValueError: If circular include detected
+        """
+        # Circular detection
+        if filepath in visited:
+            raise ValueError(f"Circular include: {filepath}")
+        visited.add(filepath)
+
+        # Load YAML
+        with open(filepath) as f:
+            data = yaml.safe_load(f) or {}
+
+        # Process include: directive FIRST
+        if "include" in data:
+            includes = data.pop("include")
+            if isinstance(includes, str):
+                includes = [includes]
+
+            # Load and merge included files
+            for inc in includes:
+                inc_path = self._resolve_path(inc, filepath)
+                inc_data = self._load_file_recursive(
+                    inc_path, visited.copy()
+                )
+                data = self._deep_merge(inc_data, data)
+
+        return data
+
+    def _resolve_path(self, include_path: str, relative_to: Path) -> Path:
+        """Resolve include path relative to including file.
+
+        Args:
+            include_path: Path from include: directive
+            relative_to: Path of file containing the include
+
+        Returns:
+            Resolved absolute path
+        """
+        path = Path(include_path)
+        if path.is_absolute():
+            return path
+        return (relative_to.parent / path).resolve()
+
+    def _deep_merge(self, base: dict, override: dict) -> dict:
+        """Deep merge override into base.
+
+        Args:
+            base: Base dictionary
+            override: Override dictionary (takes precedence)
+
+        Returns:
+            New dictionary with deep merge applied
+        """
+        result = base.copy()
+        for key, value in override.items():
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
+                result[key] = self._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        return result
+
+
 # ============================================================
 # BASE CLASSES (semantic markers for readers)
 # ============================================================
@@ -167,6 +296,29 @@ class Config(BaseModel):
     interactive: bool = Field(
         default=False,
         description="Prompt before each command execution",
+    )
+
+    # Command templates, prompts, and agent definitions
+    commands: dict[str, dict[str, str]] = Field(
+        default_factory=dict,
+        description=(
+            "Command templates organized by category "
+            "(git, shell, custom, etc.)"
+        ),
+    )
+    prompts: dict[str, dict[str, str]] = Field(
+        default_factory=dict,
+        description=(
+            "LLM prompt templates organized by agent "
+            "(resolver, planner, summarizer)"
+        ),
+    )
+    agents: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=(
+            "Agent configuration definitions "
+            "(resolver, planner, summarizer)"
+        ),
     )
 
 
@@ -338,14 +490,14 @@ class State(BaseSettings):
 
         Priority order (highest to lowest):
         1. init_settings (direct instantiation arguments)
-        2. YAML file (config.yaml)
+        2. YAML files with include support (defaults + config.yaml)
         3. .env file
         4. Environment variables
         5. File secrets
         """
         return (
             init_settings,
-            YamlConfigSettingsSource(settings_cls),
+            YamlWithIncludesSettingsSource(settings_cls),
             dotenv_settings,
             env_settings,
             file_secret_settings,
@@ -430,10 +582,13 @@ class State(BaseSettings):
 
             # Navigate through nested fields starting from self
             obj = self
-            for part in parts:
-                obj = getattr(obj, part)
-
-            return str(obj)
+            try:
+                for part in parts:
+                    obj = getattr(obj, part)
+                return str(obj)
+            except AttributeError:
+                # Not a config reference, leave unchanged
+                return match.group(0)
 
         return re.sub(r'\{([a-z._]+)\}', replace_template, value)
 

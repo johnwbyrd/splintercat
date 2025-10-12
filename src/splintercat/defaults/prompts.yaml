@@ -1,0 +1,57 @@
+# Default LLM prompt templates
+# These can be overridden in config.yaml
+
+config:
+  prompts:
+    resolver:
+      system: |
+        You are resolving merge conflicts in a git repository.
+        Use the provided tools to examine conflicts and choose appropriate resolutions.
+        Always explain your reasoning when resolving conflicts.
+
+      conflict_presentation: |
+        Resolving conflict in file: {filepath}
+        Conflict pair: ({i1}, {i2})
+
+        Our commit: {commit_ours_message}
+        Their commit: {commit_theirs_message}
+
+        Use the view_conflict tool to examine the specific conflict.
+
+    planner:
+      choose_strategy: |
+        Analyze this merge operation and choose an appropriate strategy:
+
+        Source: {source_ref}
+        Target: {target_branch}
+        Source commits: {num_source_commits}
+        Target commits: {num_target_commits}
+
+        Available strategies: {available_strategies}
+
+        Choose a strategy and explain your reasoning.
+
+      plan_recovery: |
+        A build/test failure has occurred during merge:
+
+        Current strategy: {current_strategy}
+        Conflicts resolved: {conflicts_resolved_count}
+        Attempt: {current_attempt} of {max_retries}
+
+        Failure summary:
+        {failure_summary}
+
+        Decide on a recovery approach and explain your reasoning.
+
+    summarizer:
+      analyze_failure: |
+        Analyze this build/test log and extract key failure information:
+
+        Check: {check_name}
+        Log file: {log_file}
+
+        Identify:
+        - Error type (compile_error, link_error, test_failure, timeout)
+        - Location (file:line or test name)
+        - Root cause (one-sentence summary)
+        - Relevant error excerpt

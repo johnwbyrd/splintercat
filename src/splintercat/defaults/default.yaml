@@ -1,0 +1,14 @@
+# Default configuration for splintercat
+# This file includes other default configurations
+
+include:
+  - commands.yaml
+  - prompts.yaml
+  - agents.yaml
+
+config:
+  # Default strategy settings
+  strategy:
+    max_retries: 3
+    available: [optimistic, batch, per_conflict]
+    default_batch_size: 10

@@ -1,0 +1,29 @@
+# Default agent configuration
+# These can be overridden in config.yaml
+
+config:
+  agents:
+    resolver:
+      model: "{config.llm.resolver_model}"
+      temperature: 0.7
+      max_tokens: 4096
+      tools:
+        - view_conflict
+        - view_more_context
+        - resolve_conflict
+        - git_show_commit
+        - git_log
+        - grep_codebase
+        - grep_in_file
+
+    planner:
+      model: "{config.llm.planner_model}"
+      temperature: 0.8
+      max_tokens: 2048
+      tools: []
+
+    summarizer:
+      model: "{config.llm.summarizer_model}"
+      temperature: 0.3
+      max_tokens: 2048
+      tools: []
