@@ -33,3 +33,4 @@ jobs:
         with:
           report-title: "Test Results (Python ${{ matrix.python-version }})"
           job-summary: true
+          emoji: false
