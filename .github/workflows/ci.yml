@@ -8,9 +8,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +32,6 @@ jobs:
       - name: Run tests
         uses: quantco/pytest-action@v2
         with:
-          report-title: "Test Results (Python ${{ matrix.python-version }})"
+          report-title: "Test Results (${{ matrix.os }}, Python ${{ matrix.python-version }})"
           job-summary: true
           emoji: false
