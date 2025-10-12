@@ -9,10 +9,12 @@ from src.core.log import logger
 
 
 class Runner(Context):
-    """Wrapper around invoke.Context with custom command execution methods.
+    """Wrapper around invoke.Context with custom command
+    execution methods.
 
-    Provides custom methods that don't collide with invoke's built-in functionality.
-    Uses invoke internally for all command execution.
+    Provides custom methods that don't collide with invoke's
+    built-in functionality. Uses invoke internally for all
+    command execution.
     """
 
     def execute(
@@ -25,7 +27,8 @@ class Runner(Context):
         log_level: str | None = None,
         check: bool = True,
     ) -> Result:
-        """Execute a command with full control over execution parameters.
+        """Execute a command with full control over execution
+        parameters.
 
         Args:
             command: Command string to execute
@@ -33,14 +36,18 @@ class Runner(Context):
             timeout: Maximum execution time in seconds
             stdin: String to send to command's stdin
             log_file: Path to write combined stdout/stderr output
-            log_level: Log level for real-time output (INFO, DEBUG, etc.)
-            check: If True, raise exception on non-zero exit code
+            log_level: Log level for real-time output
+                (INFO, DEBUG, etc.)
+            check: If True, raise exception on non-zero exit
+                code
 
         Returns:
-            invoke.Result with stdout, stderr, exited (return code)
+            invoke.Result with stdout, stderr, exited (return
+                code)
 
         Raises:
-            invoke.UnexpectedExit: If check=True and command returns non-zero
+            invoke.UnexpectedExit: If check=True and command
+                returns non-zero
         """
         # Prepare invoke kwargs
         kwargs = {

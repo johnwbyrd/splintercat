@@ -19,7 +19,8 @@ class MergeCommand(BaseModel):
         """Run merge workflow.
 
         Args:
-            state: State instance with config loaded and runtime initialized
+            state: State instance with config loaded and runtime
+                initialized
 
         Returns:
             Exit code (0=success, 1=failure)

@@ -6,7 +6,8 @@ from typing import Protocol
 class Tool(Protocol):
     """Protocol for LLM tools.
 
-    Tools provide functionality that LLMs can invoke via function calling.
+    Tools provide functionality that LLMs can invoke via
+    function calling.
     """
 
     @property

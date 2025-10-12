@@ -9,7 +9,8 @@ from src.core.config import State
 
 @dataclass
 class SummarizeFailure(BaseNode[State]):
-    """Extract error information from failed build logs using summarizer model."""
+    """Extract error information from failed build logs using
+    summarizer model."""
 
     async def run(
         self, ctx: GraphRunContext[State]
@@ -21,6 +22,7 @@ class SummarizeFailure(BaseNode[State]):
         """
         # TODO: Implement summarization logic
         from src.workflow.nodes.plan_recovery import PlanRecovery
+
         return PlanRecovery()
 
 # Backward compatibility

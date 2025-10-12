@@ -6,8 +6,9 @@ from src.core.log import logger
 class SwitchStrategyRecovery:
     """Switch-strategy recovery.
 
-    Changes to a more conservative strategy (optimistic → batch → per_conflict).
-    Restarts merge with better isolation.
+    Changes to a more conservative strategy
+    (optimistic → batch → per_conflict). Restarts merge with
+    better isolation.
     """
 
     def __init__(self, new_strategy: str, batch_size: int | None = None):
@@ -36,7 +37,10 @@ class SwitchStrategyRecovery:
         Returns:
             Updated state with new strategy
         """
-        logger.info(f"Recovery: switch-strategy - changing to {self.new_strategy}")
+        logger.info(
+            f"Recovery: switch-strategy - changing to "
+            f"{self.new_strategy}"
+        )
 
         # Reset to clean state
         state["resolutions"] = []

@@ -11,27 +11,32 @@ from src.core.config import State
 
 
 class CliState(State):
-    """LLM-assisted git merge conflict resolution with incremental merging.
+    """LLM-assisted git merge conflict resolution with
+    incremental merging.
 
-    Splintercat uses git-imerge to break large merges into smaller pieces,
-    resolves conflicts with LLM assistance, validates with build/test,
-    and implements smart recovery strategies when conflicts arise.
+    Splintercat uses git-imerge to break large merges into
+    smaller pieces, resolves conflicts with LLM assistance,
+    validates with build/test, and implements smart recovery
+    strategies when conflicts arise.
 
     Configuration sources (in priority order):
     1. Command-line arguments (--config.git.source_ref value)
     2. config.yaml file in current directory
     3. .env file for secrets
-    4. Environment variables (SPLINTERCAT__CONFIG__GIT__SOURCE_REF=value)
+    4. Environment variables
+       (SPLINTERCAT__CONFIG__GIT__SOURCE_REF=value)
 
     The [JSON] options allow setting multiple values at once:
-      --config.git '{"source_ref": "main", "target_branch": "stable"}'
+      --config.git '{"source_ref": "main", "target_branch":
+      "stable"}'
     """
 
     merge: CliSubCommand[MergeCommand]
     reset: CliSubCommand[ResetCommand]
 
     def cli_cmd(self):
-        """Dispatch to active subcommand, or show help if none provided."""
+        """Dispatch to active subcommand, or show help if none
+        provided."""
         # Setup logging based on verbose flag
         from src.core.log import logger
         logger.setup(self.config.verbose)

@@ -22,7 +22,10 @@ class ShowMergeSummaryTool:
     @property
     def description(self) -> str:
         """Tool description."""
-        return "Show overview of current merge (source, target, conflicts)"
+        return (
+            "Show overview of current merge "
+            "(source, target, conflicts)"
+        )
 
     @property
     def parameters(self) -> dict:
@@ -62,7 +65,9 @@ class ListAllConflictsTool:
     @property
     def description(self) -> str:
         """Tool description."""
-        return "List all conflicts in the merge with files affected"
+        return (
+            "List all conflicts in the merge with files affected"
+        )
 
     @property
     def parameters(self) -> dict:

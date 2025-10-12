@@ -65,7 +65,8 @@ def test_timeout_handling():
 
 
 def test_log_directory_creation():
-    """Test that CheckRunner creates output directory if it doesn't exist."""
+    """Test that CheckRunner creates output directory if it
+    doesn't exist."""
     with tempfile.TemporaryDirectory() as tmpdir:
         workdir = Path(tmpdir)
         output_dir = Path(tmpdir) / "nonexistent" / "logs"

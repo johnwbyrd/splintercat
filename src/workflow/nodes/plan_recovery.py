@@ -1,4 +1,5 @@
-"""PlanRecovery node - planner analyzes failure and decides next steps."""
+"""PlanRecovery node - planner analyzes failure and decides
+next steps."""
 
 from __future__ import annotations
 
@@ -27,12 +28,20 @@ class PlanRecovery(BaseNode[State, None, str]):
         max_retries = ctx.state.config.strategy.max_retries
         current_attempts = ctx.state.runtime.merge.recovery_attempts
 
-        logger.info(f"Recovery attempt {current_attempts + 1} of {max_retries}")
+        logger.info(
+            f"Recovery attempt {current_attempts + 1} of "
+            f"{max_retries}"
+        )
 
         if current_attempts >= max_retries:
-            logger.error(f"Max retries ({max_retries}) exceeded. Aborting merge.")
+            logger.error(
+                f"Max retries ({max_retries}) exceeded. "
+                f"Aborting merge."
+            )
             ctx.state.runtime.merge.status = "failed"
-            return End(f"Merge failed after {max_retries} recovery attempts")
+            return End(
+                f"Merge failed after {max_retries} recovery attempts"
+            )
 
         # TODO: Implement recovery planning logic
         from src.workflow.nodes.execute_recovery import ExecuteRecovery

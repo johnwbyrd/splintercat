@@ -2,7 +2,8 @@
 
 
 class PerConflictStrategy:
-    """Per-conflict strategy - resolve one conflict, then check immediately.
+    """Per-conflict strategy - resolve one conflict, then check
+    immediately.
 
     Best isolation of failures.
     Slowest (most checks).
@@ -18,7 +19,8 @@ class PerConflictStrategy:
         """Check after every conflict.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved since last check
+            conflicts_resolved_this_batch: Number of conflicts
+                resolved since last check
 
         Returns:
             True if any conflict resolved, False otherwise

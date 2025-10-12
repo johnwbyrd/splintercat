@@ -2,8 +2,13 @@
 
 import logfire
 
-# Clean wrapper that forwards everything to logfire without modifying it
-logger = type('Logger', (), {'__getattr__': lambda self, name: getattr(logfire, name)})()
+# Clean wrapper that forwards everything to logfire without
+# modifying it
+logger = type(
+    'Logger',
+    (),
+    {'__getattr__': lambda self, name: getattr(logfire, name)}
+)()
 
 
 def setup(verbose: bool = False):

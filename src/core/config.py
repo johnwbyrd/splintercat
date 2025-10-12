@@ -46,7 +46,10 @@ class GitConfig(BaseConfig):
     """Git repository and merge configuration."""
 
     source_ref: str = Field(
-        description="Branch, tag, or commit to merge from (e.g., 'main', 'v1.2.3')"
+        description=(
+            "Branch, tag, or commit to merge from "
+            "(e.g., 'main', 'v1.2.3')"
+        )
     )
     target_workdir: Path = Field(
         description="Path to local git repository working directory"
@@ -54,7 +57,9 @@ class GitConfig(BaseConfig):
     target_branch: str = Field(
         description="Branch to merge into (e.g., 'stable', 'develop')"
     )
-    imerge_name: str = Field(description="Unique name for this git-imerge operation")
+    imerge_name: str = Field(
+        description="Unique name for this git-imerge operation"
+    )
     imerge_goal: str = Field(
         default="merge",
         description=(
@@ -68,7 +73,10 @@ class CheckConfig(BaseConfig):
     """Build and test validation configuration."""
 
     output_dir: Path = Field(
-        description="Directory for storing check log files (supports {config.*} templates)"
+        description=(
+            "Directory for storing check log files "
+            "(supports {config.*} templates)"
+        )
     )
     default_timeout: int = Field(
         default=3600,
@@ -85,20 +93,30 @@ class LLMConfig(BaseConfig):
 
     api_key: str = Field(
         description=(
-            "API key for LLM provider (best practice: set via .env or environment variable)"
+            "API key for LLM provider "
+            "(best practice: set via .env or environment variable)"
         )
     )
     base_url: str = Field(
         description="LLM API base URL (e.g., https://openrouter.ai/api/v1)"
     )
     resolver_model: str = Field(
-        description="Model for conflict resolution (recommend: cheap/fast model)"
+        description=(
+            "Model for conflict resolution "
+            "(recommend: cheap/fast model)"
+        )
     )
     summarizer_model: str = Field(
-        description="Model for build log summarization (recommend: cheap/fast model)"
+        description=(
+            "Model for build log summarization "
+            "(recommend: cheap/fast model)"
+        )
     )
     planner_model: str = Field(
-        description="Model for strategic planning (recommend: smart/expensive model)"
+        description=(
+            "Model for strategic planning "
+            "(recommend: smart/expensive model)"
+        )
     )
 
 
@@ -107,11 +125,15 @@ class StrategyConfig(BaseConfig):
 
     max_retries: int = Field(
         default=3,
-        description="Maximum number of recovery attempts before aborting",
+        description=(
+            "Maximum number of recovery attempts before aborting"
+        ),
     )
     available: list[str] = Field(
         default=["optimistic", "batch", "per_conflict"],
-        description="Available strategies for planner to choose from",
+        description=(
+            "Available strategies for planner to choose from"
+        ),
     )
     default_batch_size: int = Field(
         default=10,
@@ -123,8 +145,8 @@ class Config(BaseModel):
     """Application configuration loaded from YAML/env/CLI.
 
     This groups all configuration into logical sections.
-    Note: Config itself doesn't inherit from BaseConfig because
-    it's the container, not a section.
+    Note: Config itself doesn't inherit from BaseConfig
+    because it's the container, not a section.
     """
     git: GitConfig = Field(
         description="Git repository and merge settings"
@@ -157,7 +179,9 @@ class GlobalState(BaseState):
 
     current_command: str = Field(
         default="",
-        description="Currently executing command (merge, reset, etc.)",
+        description=(
+            "Currently executing command (merge, reset, etc.)"
+        ),
     )
 
 
@@ -170,7 +194,9 @@ class MergeState(BaseState):
     )
     status: str = Field(
         default="pending",
-        description="Workflow status: pending, running, complete, failed",
+        description=(
+            "Workflow status: pending, running, complete, failed"
+        ),
     )
     conflicts_remaining: bool = Field(
         default=True,
@@ -178,7 +204,9 @@ class MergeState(BaseState):
     )
     conflicts_in_batch: list = Field(
         default_factory=list,
-        description="Conflicts in current batch being resolved",
+        description=(
+            "Conflicts in current batch being resolved"
+        ),
     )
     attempts: list = Field(
         default_factory=list,
@@ -190,7 +218,10 @@ class MergeState(BaseState):
     )
     current_strategy: str = Field(
         default="",
-        description="Active merge strategy: optimistic, batch, or per_conflict",
+        description=(
+            "Active merge strategy: optimistic, batch, "
+            "or per_conflict"
+        ),
     )
     check_results: list = Field(
         default_factory=list,
@@ -233,8 +264,8 @@ class Runtime(BaseModel):
     """All runtime state organized by workflow.
 
     This groups runtime state into sections by workflow/command.
-    Note: Runtime itself doesn't inherit from BaseState because
-    it's the container, not a section.
+    Note: Runtime itself doesn't inherit from BaseState
+    because it's the container, not a section.
     """
     global_: GlobalState = Field(
         default_factory=GlobalState,
@@ -273,11 +304,15 @@ class State(BaseSettings):
     """
 
     config: Config = Field(
-        description="Application configuration (from YAML/env/CLI)"
+        description=(
+            "Application configuration (from YAML/env/CLI)"
+        )
     )
     runtime: Runtime = Field(
         default_factory=Runtime,
-        description="Runtime state (mutates during workflow execution)",
+        description=(
+            "Runtime state (mutates during workflow execution)"
+        ),
     )
 
     model_config = SettingsConfigDict(
@@ -318,22 +353,26 @@ class State(BaseSettings):
 
     @model_validator(mode="after")
     def substitute_templates(self) -> "State":
-        """Substitute template variables in all string fields recursively.
+        """Substitute template variables in all string fields
+        recursively.
 
-        Supports templates like {config.git.target_workdir} which will
-        be replaced with the actual value from the state.
+        Supports templates like {config.git.target_workdir} which
+        will be replaced with the actual value from the state.
 
-        This recursively walks the entire State object and substitutes
-        templates in strings, Paths, dict values, and list items.
+        This recursively walks the entire State object and
+        substitutes templates in strings, Paths, dict values,
+        and list items.
         """
         self._substitute_recursive(self)
         return self
 
     def _substitute_recursive(self, obj: Any) -> None:
-        """Recursively substitute templates in all string/Path fields.
+        """Recursively substitute templates in all string/Path
+        fields.
 
         Args:
-            obj: Object to process (BaseModel, dict, list, or primitive)
+            obj: Object to process (BaseModel, dict, list, or
+                primitive)
         """
         if isinstance(obj, BaseModel):
             # Process all fields in the model
@@ -371,10 +410,12 @@ class State(BaseSettings):
             return value
 
     def _substitute_string(self, value: str) -> str:
-        """Replace {field.path} templates with actual field values.
+        """Replace {field.path} templates with actual field
+        values.
 
         Args:
-            value: String possibly containing {field.path} templates
+            value: String possibly containing {field.path}
+                templates
 
         Returns:
             String with templates replaced by actual values

@@ -61,7 +61,8 @@ class IMerge:
         """Get current conflict pair needing resolution.
 
         Returns:
-            Tuple of (i1, i2) for next conflict, or None if no conflicts
+            Tuple of (i1, i2) for next conflict, or None if no
+                conflicts
         """
         if not self.merge_state:
             return None
@@ -94,7 +95,8 @@ class IMerge:
 
         # Get conflicted files from git status
         output = gitimerge.check_output(
-            ["git", "diff", "--name-only", "--diff-filter=U"], cwd=str(self.workdir)
+            ["git", "diff", "--name-only", "--diff-filter=U"],
+            cwd=str(self.workdir)
         )
         return output.strip().split("\n") if output else []
 
@@ -111,7 +113,8 @@ class IMerge:
         """Check if merge is complete.
 
         Returns:
-            True if all conflicts resolved and ready to finalize
+            True if all conflicts resolved and ready to
+                finalize
         """
         if not self.merge_state:
             return False
@@ -119,7 +122,10 @@ class IMerge:
         try:
             self.merge_state.auto_complete_frontier()
             return True
-        except (gitimerge.FrontierBlockedError, gitimerge.NothingToDoError):
+        except (
+            gitimerge.FrontierBlockedError,
+            gitimerge.NothingToDoError
+        ):
             return False
 
     def finalize(self) -> str:

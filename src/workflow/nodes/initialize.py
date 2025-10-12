@@ -13,7 +13,8 @@ from src.git.imerge import IMerge
 
 @dataclass
 class Initialize(BaseNode[State]):
-    """Initialize git-imerge merge and set up initial workflow state."""
+    """Initialize git-imerge merge and set up initial workflow
+    state."""
 
     async def run(
         self, ctx: GraphRunContext[State]
@@ -43,12 +44,15 @@ class Initialize(BaseNode[State]):
             if "already in use" in error_str:
                 imerge_name = ctx.state.config.git.imerge_name
                 raise ValueError(
-                    f"git-imerge name '{imerge_name}' is already in use. "
-                    f"Change 'config.git.imerge_name' in config.yaml, "
-                    f"or clean up existing state with: python main.py reset --force"
+                    f"git-imerge name '{imerge_name}' is already in "
+                    f"use. Change 'config.git.imerge_name' in "
+                    f"config.yaml, or clean up existing state with: "
+                    f"python main.py reset --force"
                 ) from e
             else:
-                logger.error(f"Failed to initialize git-imerge merge: {e}")
+                logger.error(
+                    f"Failed to initialize git-imerge merge: {e}"
+                )
                 raise
 
         # Update workflow runtime state
@@ -57,7 +61,10 @@ class Initialize(BaseNode[State]):
         ctx.state.runtime.merge.conflicts_remaining = True
 
         # Log successful initialization
-        logger.info(f"Initialized git-imerge merge of {source_ref} into {target_branch}")
+        logger.info(
+            f"Initialized git-imerge merge of {source_ref} into "
+            f"{target_branch}"
+        )
 
         # Return next node
         from src.workflow.nodes.plan_strategy import PlanStrategy

@@ -7,7 +7,8 @@ from typing import Protocol
 class Strategy(Protocol):
     """Protocol for merge strategies.
 
-    A strategy determines how conflicts are batched for resolution and testing.
+    A strategy determines how conflicts are batched for
+    resolution and testing.
     """
 
     @property
@@ -21,10 +22,12 @@ class Strategy(Protocol):
         """Determine if we should run checks now.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved since last check
+            conflicts_resolved_this_batch: Number of conflicts
+                resolved since last check
 
         Returns:
-            True if should run checks now, False to continue resolving
+            True if should run checks now, False to continue
+                resolving
         """
         pass
 

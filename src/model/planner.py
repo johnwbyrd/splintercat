@@ -30,9 +30,12 @@ class RecoveryDecision:
         """Initialize recovery decision.
 
         Args:
-            decision: Recovery approach (retry-all, retry-specific, bisect, switch-strategy, abort)
-            conflicts_to_retry: Specific conflicts to retry if decision is retry-specific
-            new_strategy: New strategy name if decision is switch-strategy
+            decision: Recovery approach (retry-all,
+                retry-specific, bisect, switch-strategy, abort)
+            conflicts_to_retry: Specific conflicts to retry if
+                decision is retry-specific
+            new_strategy: New strategy name if decision is
+                switch-strategy
             reasoning: Explanation of the decision
         """
         self.decision = decision
@@ -44,7 +47,8 @@ class RecoveryDecision:
 class Planner:
     """LLM model for strategic planning and decision making.
 
-    Uses a smart/expensive model to make all strategic and tactical decisions.
+    Uses a smart/expensive model to make all strategic and
+    tactical decisions.
     """
 
     def __init__(self, model: str, api_key: str, base_url: str):
@@ -95,9 +99,11 @@ class Planner:
 
         Args:
             current_strategy: Current merge strategy
-            conflicts_resolved_count: Number of conflicts resolved in this attempt
+            conflicts_resolved_count: Number of conflicts
+                resolved in this attempt
             failure_summary: Summary of build failure
-            conflicts_in_attempt: List of conflict pairs in this attempt
+            conflicts_in_attempt: List of conflict pairs in this
+                attempt
             attempt_history: History of previous attempts
             max_retries: Maximum retry limit
             current_attempt: Current attempt number

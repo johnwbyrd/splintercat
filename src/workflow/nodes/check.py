@@ -24,7 +24,8 @@ class Check(BaseNode[State]):
 
         Returns:
             SummarizeFailure: If any check fails
-            ResolveConflicts: If conflicts remain after checks pass
+            ResolveConflicts: If conflicts remain after checks
+                pass
             Finalize: If checks pass and no conflicts remain
         """
         runner = CheckRunner(
@@ -50,12 +51,16 @@ class Check(BaseNode[State]):
 
             if not result.success:
                 ctx.state.runtime.merge.last_failed_check = result
-                from src.workflow.nodes.summarize_failure import SummarizeFailure
+                from src.workflow.nodes.summarize_failure import (
+                    SummarizeFailure,
+                )
+
                 return SummarizeFailure()
 
         # All checks passed
         if ctx.state.runtime.merge.conflicts_remaining:
             from src.workflow.nodes.resolve_conflicts import ResolveConflicts
+
             return ResolveConflicts()
         else:
             from src.workflow.nodes.finalize import Finalize

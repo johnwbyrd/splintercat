@@ -17,10 +17,12 @@ class OptimisticStrategy:
         """Never check until all conflicts resolved.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved (ignored)
+            conflicts_resolved_this_batch: Number of conflicts
+                resolved (ignored)
 
         Returns:
-            Always False - never check during conflict resolution
+            Always False - never check during conflict
+                resolution
         """
         return False
 

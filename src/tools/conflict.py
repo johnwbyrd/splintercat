@@ -43,7 +43,12 @@ class ViewConflictTool:
             "required": ["file", "conflict_num"],
         }
 
-    def execute(self, file: str, conflict_num: int, context_lines: int = 10) -> str:
+    def execute(
+        self,
+        file: str,
+        conflict_num: int,
+        context_lines: int = 10
+    ) -> str:
         """Execute tool - view conflict with context.
 
         Args:
@@ -86,14 +91,29 @@ class ViewMoreContextTool:
             "type": "object",
             "properties": {
                 "file": {"type": "string", "description": "File path"},
-                "conflict_num": {"type": "integer", "description": "Conflict number (1-indexed)"},
-                "before": {"type": "integer", "description": "Lines before conflict"},
-                "after": {"type": "integer", "description": "Lines after conflict"},
+                "conflict_num": {
+                    "type": "integer",
+                    "description": "Conflict number (1-indexed)"
+                },
+                "before": {
+                    "type": "integer",
+                    "description": "Lines before conflict"
+                },
+                "after": {
+                    "type": "integer",
+                    "description": "Lines after conflict"
+                },
             },
             "required": ["file", "conflict_num", "before", "after"],
         }
 
-    def execute(self, file: str, conflict_num: int, before: int, after: int) -> str:
+    def execute(
+        self,
+        file: str,
+        conflict_num: int,
+        before: int,
+        after: int
+    ) -> str:
         """Execute tool.
 
         Args:
@@ -106,7 +126,10 @@ class ViewMoreContextTool:
             Formatted conflict view
         """
         # Implementation stub
-        return f"Conflict {conflict_num} in {file} with {before} before, {after} after (pending)"
+        return (
+            f"Conflict {conflict_num} in {file} with {before} "
+            f"before, {after} after (pending)"
+        )
 
 
 class ResolveConflictTool:
@@ -137,7 +160,10 @@ class ResolveConflictTool:
             "type": "object",
             "properties": {
                 "file": {"type": "string", "description": "File path"},
-                "conflict_num": {"type": "integer", "description": "Conflict number (1-indexed)"},
+                "conflict_num": {
+                    "type": "integer",
+                    "description": "Conflict number (1-indexed)"
+                },
                 "choice": {
                     "type": "string",
                     "enum": ["ours", "theirs", "both", "custom"],
@@ -152,7 +178,11 @@ class ResolveConflictTool:
         }
 
     def execute(
-        self, file: str, conflict_num: int, choice: str, custom_text: str | None = None
+        self,
+        file: str,
+        conflict_num: int,
+        choice: str,
+        custom_text: str | None = None
     ) -> str:
         """Execute tool - resolve conflict.
 
@@ -166,4 +196,7 @@ class ResolveConflictTool:
             Confirmation message
         """
         # Implementation stub
-        return f"Resolved conflict {conflict_num} in {file} with choice: {choice} (pending)"
+        return (
+            f"Resolved conflict {conflict_num} in {file} with "
+            f"choice: {choice} (pending)"
+        )

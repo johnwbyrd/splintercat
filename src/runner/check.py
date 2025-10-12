@@ -21,8 +21,14 @@ class CheckRunner:
         self.output_dir = output_dir
         self.runner = Runner()
 
-    def run(self, check_name: str, command: str, timeout: int) -> CheckResult:
-        """Run check command and save output to timestamped log file.
+    def run(
+        self,
+        check_name: str,
+        command: str,
+        timeout: int
+    ) -> CheckResult:
+        """Run check command and save output to timestamped log
+        file.
 
         Args:
             check_name: Name of check (used in log filename)
@@ -30,10 +36,13 @@ class CheckRunner:
             timeout: Timeout in seconds
 
         Returns:
-            CheckResult with success status, log file path, returncode, and timestamp
+            CheckResult with success status, log file path,
+                returncode, and timestamp
         """
         timestamp = datetime.now()
-        log_filename = f"{check_name}-{timestamp.strftime('%Y%m%d-%H%M%S')}.log"
+        log_filename = (
+            f"{check_name}-{timestamp.strftime('%Y%m%d-%H%M%S')}.log"
+        )
         log_file = self.output_dir / log_filename
 
         # Ensure output directory exists

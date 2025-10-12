@@ -18,7 +18,8 @@ class CheckFailureSummary:
 
         Args:
             check_name: Name of check that failed
-            error_type: Type of error (compile_error, link_error, test_failure, timeout)
+            error_type: Type of error (compile_error, link_error,
+                test_failure, timeout)
             location: File:line or test name where error occurred
             root_cause: One-sentence description of root cause
             excerpt: Relevant error message excerpt
@@ -33,7 +34,8 @@ class CheckFailureSummary:
 class Summarizer:
     """LLM model for summarizing check logs.
 
-    Uses a cheap/fast model to extract actionable error information from verbose logs.
+    Uses a cheap/fast model to extract actionable error
+    information from verbose logs.
     """
 
     def __init__(self, model: str, api_key: str, base_url: str):

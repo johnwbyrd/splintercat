@@ -26,7 +26,8 @@ class RetrySpecificRecovery:
     def execute(self, state: dict) -> dict:
         """Execute retry-specific recovery.
 
-        Keeps resolutions that aren't being retried, clears specific ones.
+        Keeps resolutions that aren't being retried, clears
+        specific ones.
 
         Args:
             state: Current workflow state

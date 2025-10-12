@@ -32,11 +32,15 @@ class GitShowCommitTool:
             "properties": {
                 "ref": {
                     "type": "string",
-                    "description": "Git ref (SHA, HEAD, FETCH_HEAD, etc)",
+                    "description": (
+                        "Git ref (SHA, HEAD, FETCH_HEAD, etc)"
+                    ),
                 },
                 "file": {
                     "type": "string",
-                    "description": "Optional: show changes only for this file",
+                    "description": (
+                        "Optional: show changes only for this file"
+                    ),
                 },
             },
             "required": ["ref"],
@@ -83,8 +87,14 @@ class GitLogTool:
         return {
             "type": "object",
             "properties": {
-                "file": {"type": "string", "description": "Optional: log for specific file"},
-                "max_count": {"type": "integer", "description": "Number of commits (default 10)"},
+                "file": {
+                    "type": "string",
+                    "description": "Optional: log for specific file"
+                },
+                "max_count": {
+                    "type": "integer",
+                    "description": "Number of commits (default 10)"
+                },
             },
             "required": [],
         }
@@ -100,4 +110,7 @@ class GitLogTool:
             Formatted git log
         """
         # Implementation stub
-        return f"Git log (max {max_count} commits) (implementation pending)"
+        return (
+            f"Git log (max {max_count} commits) "
+            f"(implementation pending)"
+        )

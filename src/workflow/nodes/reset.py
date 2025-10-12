@@ -13,10 +13,12 @@ from src.core.runner import Runner
 
 @dataclass
 class Reset(BaseNode[State]):
-    """Reset (discard) all git-imerge state for a merge operation."""
+    """Reset (discard) all git-imerge state for a merge
+    operation."""
 
     async def run(self, ctx: GraphRunContext[State]) -> End[None]:
-        """Reset all git-imerge state, returning repository to clean state.
+        """Reset all git-imerge state, returning repository to
+        clean state.
 
         Returns:
             End[None]: Workflow completion with no data
@@ -38,7 +40,8 @@ class Reset(BaseNode[State]):
             logger.info("Reset cancelled by user")
             return End(None)
 
-        # Perform reset - deletes all imerge refs in one atomic operation
+        # Perform reset - deletes all imerge refs in one atomic
+        # operation
         self._reset_all_merges(runner, workdir)
 
         # Update state
@@ -46,7 +49,10 @@ class Reset(BaseNode[State]):
         ctx.state.runtime.reset.status = "complete"
         ctx.state.runtime.merge.current_imerge = None
 
-        logger.info("Git repository reset complete - all imerge state discarded")
+        logger.info(
+            "Git repository reset complete - all imerge state "
+            "discarded"
+        )
         return End(None)
 
     def _get_existing_merges(self, runner: Runner, workdir) -> list[str]:
@@ -58,11 +64,17 @@ class Reset(BaseNode[State]):
                 cwd=workdir,
                 check=True,
             )
-            logger.debug(f"Git command stdout length: {len(result.stdout)} chars")
-            logger.debug(f"Git command output (first 500 chars): {result.stdout[:500]}")
+            logger.debug(
+                f"Git command stdout length: {len(result.stdout)} chars"
+            )
+            logger.debug(
+                f"Git command output (first 500 chars): "
+                f"{result.stdout[:500]}"
+            )
 
             # Extract unique merge names from imerge/NAME/...
-            # Note: refname:short format gives "imerge/NAME/..." not "refs/imerge/NAME/..."
+            # Note: refname:short format gives "imerge/NAME/..."
+            # not "refs/imerge/NAME/..."
             lines = result.stdout.strip().split('\n')
             logger.debug(f"Found {len(lines)} ref lines")
 
@@ -74,23 +86,37 @@ class Reset(BaseNode[State]):
                     if len(parts) >= 2:
                         names.add(parts[1])
 
-            logger.info(f"Found {len(names)} unique merge names: {sorted(names)}")
+            logger.info(
+                f"Found {len(names)} unique merge names: "
+                f"{sorted(names)}"
+            )
             return sorted(names)
         except Exception as e:
             logger.error(f"Failed to get existing merges: {e}")
             return []
 
-    def _get_merge_refs(self, runner: Runner, workdir, merge_name: str) -> list[str]:
+    def _get_merge_refs(
+        self,
+        runner: Runner,
+        workdir,
+        merge_name: str
+    ) -> list[str]:
         """Get all refs for a specific merge."""
         logger.debug(f"Getting refs for merge: {merge_name}")
         try:
-            # Use prefix matching, not glob - git for-each-ref matches all refs with this prefix
+            # Use prefix matching, not glob - git for-each-ref
+            # matches all refs with this prefix
             result = runner.execute(
-                f"git for-each-ref --format='%(refname)' refs/imerge/{merge_name}/",
+                f"git for-each-ref --format='%(refname)' "
+                f"refs/imerge/{merge_name}/",
                 cwd=workdir,
                 check=True,
             )
-            refs = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+            refs = [
+                line.strip()
+                for line in result.stdout.strip().split('\n')
+                if line.strip()
+            ]
             logger.debug(f"Found {len(refs)} refs for {merge_name}")
             return refs
         except Exception as e:
@@ -101,10 +127,17 @@ class Reset(BaseNode[State]):
         """Get user confirmation for reset operation."""
         # TODO: Implement interactive confirmation
         # For now, show warning and assume cancelled for safety
-        logger.warning("Interactive confirmation not implemented - reset cancelled for safety")
-        logger.warning(f"Would delete all refs from {num_merges} imerge merge(s)")
         logger.warning(
-            "Use 'python main.py reset --force true' to force reset without confirmation"
+            "Interactive confirmation not implemented - reset "
+            "cancelled for safety"
+        )
+        logger.warning(
+            f"Would delete all refs from {num_merges} imerge "
+            f"merge(s)"
+        )
+        logger.warning(
+            "Use 'python main.py reset --force true' to force "
+            "reset without confirmation"
         )
         return False
 
@@ -112,19 +145,25 @@ class Reset(BaseNode[State]):
         """Reset all imerge state by deleting all refs.
 
         Uses git pipeline approach from Stack Overflow:
-        https://stackoverflow.com/questions/46229291/in-git-how-can-i-efficiently-delete-all-refs-matching-a-pattern
+        https://stackoverflow.com/questions/46229291/
+        in-git-how-can-i-efficiently-delete-all-refs-matching-
+        a-pattern
 
-        The command 'git for-each-ref --format="delete %(refname)" refs/imerge/'
-        generates delete commands for each ref, which are piped to
-        'git update-ref --stdin' for atomic bulk deletion.
+        The command 'git for-each-ref --format="delete
+        %(refname)" refs/imerge/' generates delete commands for
+        each ref, which are piped to 'git update-ref --stdin'
+        for atomic bulk deletion.
         """
         logger.info("Deleting all imerge refs via git pipeline")
 
-        # Single pipeline command to delete all imerge refs atomically
-        # format='delete %(refname)' generates: delete refs/imerge/name/path
-        # These are piped to update-ref --stdin which executes all deletions together
+        # Single pipeline command to delete all imerge refs
+        # atomically. format='delete %(refname)' generates:
+        # delete refs/imerge/name/path. These are piped to
+        # update-ref --stdin which executes all deletions
+        # together
         runner.execute(
-            "git for-each-ref --format='delete %(refname)' refs/imerge/ | git update-ref --stdin",
+            "git for-each-ref --format='delete %(refname)' "
+            "refs/imerge/ | git update-ref --stdin",
             cwd=workdir,
             check=True,
         )

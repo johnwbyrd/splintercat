@@ -1,4 +1,5 @@
-"""ExecuteRecovery node - apply recovery strategy based on planner decision."""
+"""ExecuteRecovery node - apply recovery strategy based on
+planner decision."""
 
 from __future__ import annotations
 
@@ -24,7 +25,10 @@ class ExecuteRecovery(BaseNode[State]):
         """
         # Increment recovery attempt counter
         ctx.state.runtime.merge.recovery_attempts += 1
-        logger.info(f"Executing recovery attempt {ctx.state.runtime.merge.recovery_attempts}")
+        logger.info(
+            f"Executing recovery attempt "
+            f"{ctx.state.runtime.merge.recovery_attempts}"
+        )
 
         # TODO: Implement recovery execution logic
         from src.workflow.nodes.resolve_conflicts import ResolveConflicts

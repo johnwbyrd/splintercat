@@ -7,7 +7,8 @@ from typing import Protocol
 class Recovery(Protocol):
     """Protocol for recovery strategies.
 
-    A recovery strategy determines how to respond to build/test failures.
+    A recovery strategy determines how to respond to build/test
+    failures.
     """
 
     @property

@@ -25,7 +25,8 @@ class BatchStrategy:
         """Check after N conflicts resolved.
 
         Args:
-            conflicts_resolved_this_batch: Number of conflicts resolved since last check
+            conflicts_resolved_this_batch: Number of conflicts
+                resolved since last check
 
         Returns:
             True if batch size reached, False otherwise

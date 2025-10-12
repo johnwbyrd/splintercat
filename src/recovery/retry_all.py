@@ -18,15 +18,20 @@ class RetryAllRecovery:
     def execute(self, state: dict) -> dict:
         """Execute retry-all recovery.
 
-        Clears all resolutions and adds failure context for re-resolution.
+        Clears all resolutions and adds failure context for
+        re-resolution.
 
         Args:
             state: Current workflow state
 
         Returns:
-            Updated state with resolutions cleared and failure context added
+            Updated state with resolutions cleared and failure
+                context added
         """
-        logger.info("Recovery: retry-all - re-resolving all conflicts with failure context")
+        logger.info(
+            "Recovery: retry-all - re-resolving all conflicts with "
+            "failure context"
+        )
 
         # Add failure context for resolver to use
         failure_summary = state.get("failure_summary")

@@ -30,17 +30,30 @@ class GrepCodebaseTool:
         return {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "Regex pattern to search"},
+                "pattern": {
+                    "type": "string",
+                    "description": "Regex pattern to search"
+                },
                 "file_pattern": {
                     "type": "string",
-                    "description": "Optional glob to filter files (e.g. *.cpp)",
+                    "description": (
+                        "Optional glob to filter files (e.g. *.cpp)"
+                    ),
                 },
-                "context_lines": {"type": "integer", "description": "Lines of context (default 2)"},
+                "context_lines": {
+                    "type": "integer",
+                    "description": "Lines of context (default 2)"
+                },
             },
             "required": ["pattern"],
         }
 
-    def execute(self, pattern: str, file_pattern: str | None = None, context_lines: int = 2) -> str:
+    def execute(
+        self,
+        pattern: str,
+        file_pattern: str | None = None,
+        context_lines: int = 2
+    ) -> str:
         """Execute tool.
 
         Args:
@@ -74,7 +87,9 @@ class GrepInFileTool:
     @property
     def description(self) -> str:
         """Tool description."""
-        return "Search for regex pattern within a specific file"
+        return (
+            "Search for regex pattern within a specific file"
+        )
 
     @property
     def parameters(self) -> dict:
@@ -82,9 +97,18 @@ class GrepInFileTool:
         return {
             "type": "object",
             "properties": {
-                "file": {"type": "string", "description": "File to search"},
-                "pattern": {"type": "string", "description": "Regex pattern"},
-                "context_lines": {"type": "integer", "description": "Lines of context (default 2)"},
+                "file": {
+                    "type": "string",
+                    "description": "File to search"
+                },
+                "pattern": {
+                    "type": "string",
+                    "description": "Regex pattern"
+                },
+                "context_lines": {
+                    "type": "integer",
+                    "description": "Lines of context (default 2)"
+                },
             },
             "required": ["file", "pattern"],
         }
@@ -101,4 +125,7 @@ class GrepInFileTool:
             Formatted search results
         """
         # Implementation stub
-        return f"Search results for '{pattern}' in {file} (implementation pending)"
+        return (
+            f"Search results for '{pattern}' in {file} "
+            f"(implementation pending)"
+        )

@@ -1,1 +1,2 @@
-"""Core functionality - command running, config, logging, git operations, value objects."""
+"""Core functionality - command running, config, logging, git
+operations, value objects."""
