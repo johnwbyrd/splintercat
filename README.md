@@ -4,7 +4,7 @@ Merging a thousand upstream commits by hand is miserable. Resolving dozens of co
 
 Discovering your merge breaks the build hours later is worse. Now you have no idea which conflict resolution caused the problem.
 
-Splintercat automates the entire process. It breaks large merges into manageable pieces using git-imerge, resolves conflicts automatically with LLMs, validates each batch with your build and test suite, and recovers intelligently when something goes wrong.
+Splintercat automates the entire process. It breaks large merges into manageable pieces using git-imerge, resolves conflicts automatically with an LLM, and validates incrementally with your build and test suite.
 
 You get a clean merge commit that preserves history and passes all tests.
 
@@ -14,7 +14,7 @@ Splintercat uses git-imerge to subdivide your merge into small pairwise commits.
 
 The system validates incrementally—testing after small batches of resolutions rather than waiting until the end.
 
-When builds fail, it analyzes the errors and tries different resolution strategies automatically. Most merges succeed without human intervention.
+When builds fail, it retries the current batch with error context so the LLM can make better decisions. After a configurable number of retries, it stops and asks for human help.
 
 The result is a single two-parent merge commit, just like a normal merge, with all original commit hashes preserved.
 
@@ -55,9 +55,12 @@ config:
 
   llm:
     base_url: https://openrouter.ai/api/v1
-    resolver_model: openai/gpt-4o-mini
-    planner_model: anthropic/claude-sonnet-4
-    summarizer_model: openai/gpt-4o-mini
+    model: openai/gpt-4o
+
+  strategy:
+    name: batch
+    batch_size: 10
+    max_retries: 3
 ```
 
 Create a `.env` file for your API key:
@@ -99,16 +102,17 @@ Key settings:
 - `config.git.target_branch`: What branch to merge into
 - `config.check.commands`: Your build/test commands
 - `config.llm.api_key`: OpenRouter or OpenAI API key (set via environment variable)
-- `config.llm.resolver_model`: Fast, cheap model for conflict resolution
-- `config.llm.planner_model`: Smart model for strategy decisions
+- `config.llm.model`: LLM model for conflict resolution (e.g., openai/gpt-4o)
+- `config.strategy.name`: Strategy (optimistic, batch, or per_conflict)
+- `config.strategy.batch_size`: How many conflicts to resolve before checking
 
 See [docs/configuration.md](docs/configuration.md) for complete details.
 
 ## Current status
 
-Core architecture is complete. LLM integration and workflow nodes are still being implemented.
+MVP architecture complete: simplified workflow with 4 nodes (Initialize, ResolveConflicts, Check, Finalize), single LLM model, and simple retry mechanism. Resolver implementation in progress.
 
-See [docs/todo.md](docs/todo.md) for implementation status.
+See [docs/todo.md](docs/todo.md) for implementation roadmap.
 
 ## Using as a Library
 
@@ -138,4 +142,4 @@ Large projects like LLVM require frequent merges of thousands of upstream commit
 
 Doing this manually is slow and error-prone. When builds fail after merging, isolating the problematic conflict resolution is nearly impossible with traditional tools.
 
-Splintercat automates the entire workflow while maintaining the ability to recover from failures intelligently.
+Splintercat automates the entire workflow with a focused, pragmatic approach: subdivide the merge, resolve conflicts with LLM assistance, validate incrementally, and retry with error context when needed.
