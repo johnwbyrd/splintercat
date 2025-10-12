@@ -30,9 +30,6 @@ class ResetCommand(BaseModel):
         # Set force flag on reset state
         state.runtime.reset.force = self.force
 
-        # Set current command
-        state.runtime.global_.current_command = "reset"
-
         # Create single-node workflow
         from pydantic_graph import Graph
 

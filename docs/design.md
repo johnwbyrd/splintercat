@@ -28,25 +28,19 @@ The LLM picks a resolution (ours, theirs, or a custom merge) and explains its re
 
 ### Step 3: Validate Incrementally
 
-You don't want to resolve 50 conflicts and then discover the build is broken. The system uses strategies to decide when to build and test:
+You don't want to resolve 50 conflicts and then discover the build is broken. You configure a strategy to decide when to build and test:
 
 - **optimistic**: Resolve everything, then test once (fast but risky)
 - **batch**: Resolve 10 conflicts, test, repeat (balanced)
 - **per-conflict**: Resolve one conflict, test immediately (slow but safe)
 
-A planner LLM picks the strategy based on the merge size and complexity.
+The strategy is configured by the user in config.yaml, not chosen by an LLM.
 
 ### Step 4: Recover from Failures
 
-When the build breaks, a summarizer LLM reads the build log and extracts what went wrong. Then the planner LLM decides how to fix it:
+When the build breaks, retry the current batch with the error log as additional context. The resolver sees what went wrong and can make better decisions on the second try.
 
-- **retry-all**: Re-resolve all conflicts with the error message as additional context
-- **retry-specific**: Re-resolve just the conflicts that probably caused the error
-- **bisect**: Binary search to find the bad resolution
-- **switch-strategy**: Change to a more conservative approach (batch → per-conflict)
-- **abort**: Give up and ask a human for help
-
-The system tries up to 5 recovery attempts before giving up.
+After max_retries (default 3) attempts, abort and ask for human help.
 
 ### Step 5: Finish
 
@@ -54,37 +48,34 @@ Once all conflicts are resolved and tests pass, git-imerge simplifies the hundre
 
 ## Architecture
 
-### Three LLMs with Different Jobs
+### One LLM, One Job
 
-**Resolver** (fast, cheap model):
-- Input: Conflict with context
+**Resolver** (single model):
+- Input: Conflict with context, optionally error from previous attempt
 - Output: Resolved code
-- Model: gpt-4o-mini or similar
+- Model: gpt-4o, claude-sonnet-4, or similar
 
-**Summarizer** (fast, cheap model):
-- Input: Build/test log (may be huge)
-- Output: What failed and where
-- Model: gpt-4o-mini or similar
-
-**Planner** (smart, expensive model):
-- Input: Merge state, failure history
-- Output: Strategic decisions with reasoning
-- Model: claude-sonnet-4 or similar
+No separate planner or summarizer models. Keep it simple.
 
 ### Workflow Orchestration
 
 Pydantic AI Graph manages the workflow as a state machine:
-- Routes between resolving conflicts, building, testing, and recovery
-- Persists state so you can resume interrupted merges
-- Logs every decision for debugging
+```
+Initialize → ResolveConflicts → Check → [retry or next batch or finalize]
+```
+
+**Initialize**: Start git-imerge, create strategy from config
+**ResolveConflicts**: Resolve conflicts until strategy says to check
+**Check**: Run checks, on failure retry with error context, on success continue or finalize
+**Finalize**: Call imerge.finalize() to create merge commit
 
 ### Configuration
 
 Everything is configured in config.yaml:
 - Which branch to merge
+- Which strategy to use (optimistic/batch/per_conflict)
 - Build and test commands
-- Which LLM models to use
-- Strategy preferences and retry limits
+- Which LLM model to use
 
 You can override any setting via environment variables or command-line arguments.
 
@@ -92,30 +83,40 @@ You can override any setting via environment variables or command-line arguments
 
 ### Small, Isolated Changes
 
-git-imerge gives us tiny, isolated conflicts. When something breaks, we know exactly which commits were involved. This makes automated recovery actually possible.
+git-imerge gives us tiny, isolated conflicts. When something breaks, we know exactly which batch was involved. This makes automated recovery actually possible.
 
-### Multiple LLMs for Multiple Jobs
+### One Model for Everything
 
-Resolving conflicts is mechanical work (fast model). Strategic planning requires reasoning (expensive model). Using the right model for each job keeps costs reasonable.
+Using a single capable model for all conflict resolution avoids coordination overhead and keeps costs predictable. If this becomes a bottleneck, we can specialize later based on evidence.
 
-### Incremental Validation
+### Deterministic Strategy Selection
 
-Testing after every resolution would be too slow. Testing only at the end makes failures hard to debug. Letting an LLM decide when to test balances speed and debuggability.
+The user chooses the strategy based on their merge size and risk tolerance. No need for an LLM to make this decision—it's a straightforward engineering tradeoff.
 
-### Intelligent Recovery
+### Simple Retry
 
-Most merge tools just fail when the build breaks. Splintercat analyzes the failure, identifies the likely cause, and tries a different approach. This turns "stuck forever" into "succeeds after 2-3 attempts."
+Most build failures are due to incorrect conflict resolution. Passing the error log back to the resolver on retry gives it the context to fix the mistake. This is simpler than trying to identify which specific conflict caused the problem.
 
 ## What This Doesn't Do
 
 - Won't subdivide individual commits (git-imerge limitation)
-- Won't ask you for approval at each step (fully automated)
+- Won't automatically choose strategies (user configured)
+- Won't analyze build logs separately (passes raw logs to resolver)
+- Won't bisect failures (retries entire batch)
 - Won't learn from historical merges (no ML/memory)
-- Won't resolve conflicts in parallel (sequential only)
-- Won't give you a web UI (command-line only)
 
-These might come later, but they're not in the MVP.
+These might come later if evidence shows they're needed, but they're not in the MVP.
 
 ## Success Looks Like
 
-You run `splintercat merge`, go get coffee, and come back to a completed merge with all tests passing. The logs show what the LLMs decided and why. If it failed, the logs explain what went wrong and what recovery strategies were tried.
+You run `splintercat merge`, go get coffee, and come back to a completed merge with all tests passing. The logs show what the resolver decided and why. If it failed after max_retries, the logs explain what went wrong and which conflicts to review manually.
+
+## Deferred Complexity
+
+The following were removed as speculative:
+- **Planner LLM**: User configures strategy explicitly
+- **Summarizer LLM**: Raw error logs work for now
+- **Complex recovery**: Bisect, switch-strategy, retry-specific—add only if simple retry fails
+- **Multiple check levels**: One check command is enough to start
+
+Add these back only when real-world use shows they're necessary.

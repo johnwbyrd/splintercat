@@ -19,13 +19,11 @@ class Check(BaseNode[State]):
 
     async def run(
         self, ctx: GraphRunContext[State]
-    ) -> "SummarizeFailure | ResolveConflicts | Finalize":
-        """Run checks and route on failure.
+    ) -> "ResolveConflicts | Finalize":
+        """Run checks and route based on result.
 
         Returns:
-            SummarizeFailure: If any check fails
-            ResolveConflicts: If conflicts remain after checks
-                pass
+            ResolveConflicts: If check fails (retry) or conflicts remain
             Finalize: If checks pass and no conflicts remain
         """
         runner = CheckRunner(
@@ -43,27 +41,48 @@ class Check(BaseNode[State]):
             result = runner.run(
                 name,
                 cmd,
-                ctx.state.config.check.default_timeout
+                ctx.state.config.check.timeout
             )
 
-            # Record result in state
-            ctx.state.runtime.merge.check_results.append(result)
-
             if not result.success:
+                # Check failed - retry current batch with error context
                 ctx.state.runtime.merge.last_failed_check = result
-                from splintercat.workflow.nodes.summarize_failure import (
-                    SummarizeFailure,
+                ctx.state.runtime.merge.retry_count += 1
+
+                # Check if max retries exceeded
+                max_retries = ctx.state.config.strategy.max_retries
+                if ctx.state.runtime.merge.retry_count > max_retries:
+                    logger.error(
+                        f"Max retries ({max_retries}) exceeded. Aborting."
+                    )
+                    raise RuntimeError(
+                        f"Check '{name}' failed after {max_retries} "
+                        f"retry attempts"
+                    )
+
+                logger.warning(
+                    f"Check '{name}' failed "
+                    f"(attempt {ctx.state.runtime.merge.retry_count}"
+                    f"/{max_retries}). Retrying batch with error context."
                 )
 
-                return SummarizeFailure()
+                # Retry: go back to ResolveConflicts
+                from splintercat.workflow.nodes.resolve_conflicts import (
+                    ResolveConflicts,
+                )
+                return ResolveConflicts()
 
-        # All checks passed
+        # All checks passed - reset retry counter
+        ctx.state.runtime.merge.retry_count = 0
+
+        # Route based on whether conflicts remain
         if ctx.state.runtime.merge.conflicts_remaining:
+            logger.info("All checks passed. Resolving next batch.")
             from splintercat.workflow.nodes.resolve_conflicts import (
                 ResolveConflicts,
             )
-
             return ResolveConflicts()
         else:
+            logger.info("All checks passed. No conflicts remain. Finalizing.")
             from splintercat.workflow.nodes.finalize import Finalize
             return Finalize()

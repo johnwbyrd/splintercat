@@ -18,11 +18,11 @@ class Initialize(BaseNode[State]):
 
     async def run(
         self, ctx: GraphRunContext[State]
-    ) -> "PlanStrategy":
+    ) -> "ResolveConflicts":
         """Start git-imerge merge and initialize workflow state.
 
         Returns:
-            PlanStrategy: Next node to choose merge strategy
+            ResolveConflicts: Next node to resolve conflicts
         """
         # Get configuration from state
         source_ref = ctx.state.config.git.source_ref
@@ -55,17 +55,35 @@ class Initialize(BaseNode[State]):
                 )
                 raise
 
+        # Create strategy based on config
+        strategy_name = ctx.state.config.strategy.name
+        if strategy_name == "optimistic":
+            from splintercat.strategy.optimistic import OptimisticStrategy
+            strategy = OptimisticStrategy()
+        elif strategy_name == "batch":
+            from splintercat.strategy.batch import BatchStrategy
+            batch_size = ctx.state.config.strategy.batch_size
+            strategy = BatchStrategy(batch_size)
+        elif strategy_name == "per_conflict":
+            from splintercat.strategy.per_conflict import PerConflictStrategy
+            strategy = PerConflictStrategy()
+        else:
+            raise ValueError(f"Unknown strategy: {strategy_name}")
+
         # Update workflow runtime state
         ctx.state.runtime.merge.current_imerge = imerge
         ctx.state.runtime.merge.status = "initialized"
         ctx.state.runtime.merge.conflicts_remaining = True
+        ctx.state.runtime.merge.strategy = strategy
 
         # Log successful initialization
         logger.info(
             f"Initialized git-imerge merge of {source_ref} into "
-            f"{target_branch}"
+            f"{target_branch} with {strategy_name} strategy"
         )
 
         # Return next node
-        from splintercat.workflow.nodes.plan_strategy import PlanStrategy
-        return PlanStrategy()
+        from splintercat.workflow.nodes.resolve_conflicts import (
+            ResolveConflicts,
+        )
+        return ResolveConflicts()

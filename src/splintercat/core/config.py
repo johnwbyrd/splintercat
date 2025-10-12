@@ -79,13 +79,13 @@ class CheckConfig(BaseConfig):
             "(supports {config.*} templates)"
         )
     )
-    default_timeout: int = Field(
-        default=3600,
-        description="Default timeout for checks in seconds (1 hour = 3600)",
-    )
     commands: dict[str, str] = Field(
         default_factory=dict,
         description="Named check commands (e.g., quick, normal, full)",
+    )
+    timeout: int = Field(
+        default=3600,
+        description="Timeout for checks in seconds (1 hour = 3600)",
     )
 
 
@@ -101,44 +101,31 @@ class LLMConfig(BaseConfig):
     base_url: str = Field(
         description="LLM API base URL (e.g., https://openrouter.ai/api/v1)"
     )
-    resolver_model: str = Field(
+    model: str = Field(
         description=(
             "Model for conflict resolution "
-            "(recommend: cheap/fast model)"
-        )
-    )
-    summarizer_model: str = Field(
-        description=(
-            "Model for build log summarization "
-            "(recommend: cheap/fast model)"
-        )
-    )
-    planner_model: str = Field(
-        description=(
-            "Model for strategic planning "
-            "(recommend: smart/expensive model)"
+            "(e.g., openai/gpt-4o, anthropic/claude-sonnet-4)"
         )
     )
 
 
 class StrategyConfig(BaseConfig):
-    """Merge strategy and recovery configuration."""
+    """Merge strategy configuration."""
 
+    name: str = Field(
+        default="batch",
+        description=(
+            "Strategy: optimistic (resolve all, check once), "
+            "batch (resolve N, check), per_conflict (check after each)"
+        ),
+    )
+    batch_size: int = Field(
+        default=10,
+        description="Batch size for 'batch' strategy",
+    )
     max_retries: int = Field(
         default=3,
-        description=(
-            "Maximum number of recovery attempts before aborting"
-        ),
-    )
-    available: list[str] = Field(
-        default=["optimistic", "batch", "per_conflict"],
-        description=(
-            "Available strategies for planner to choose from"
-        ),
-    )
-    default_batch_size: int = Field(
-        default=10,
-        description="Default batch size for 'batch' strategy",
+        description="Maximum retries per batch before aborting",
     )
 
 
@@ -180,17 +167,11 @@ class Config(BaseModel):
     )
     prompts: dict[str, dict[str, str]] = Field(
         default_factory=dict,
-        description=(
-            "LLM prompt templates organized by agent "
-            "(resolver, planner, summarizer)"
-        ),
+        description="LLM prompt templates for resolver",
     )
     agents: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
-        description=(
-            "Agent configuration definitions "
-            "(resolver, planner, summarizer)"
-        ),
+        description="Agent configuration for resolver",
     )
 
 
@@ -200,13 +181,7 @@ class Config(BaseModel):
 
 class GlobalState(BaseState):
     """Global runtime state shared across all workflows."""
-
-    current_command: str = Field(
-        default="",
-        description=(
-            "Currently executing command (merge, reset, etc.)"
-        ),
-    )
+    pass
 
 
 class MergeState(BaseState):
@@ -232,32 +207,21 @@ class MergeState(BaseState):
             "Conflicts in current batch being resolved"
         ),
     )
-    attempts: list = Field(
-        default_factory=list,
-        description="History of resolution attempts",
-    )
     resolutions: list = Field(
         default_factory=list,
         description="History of successful resolutions",
-    )
-    current_strategy: str = Field(
-        default="",
-        description=(
-            "Active merge strategy: optimistic, batch, "
-            "or per_conflict"
-        ),
-    )
-    check_results: list = Field(
-        default_factory=list,
-        description="Results from all check executions",
     )
     last_failed_check: Any = Field(
         default=None,
         description="Most recent failed check result",
     )
-    recovery_attempts: int = Field(
+    retry_count: int = Field(
         default=0,
-        description="Number of recovery attempts made so far",
+        description="Number of retries for current batch",
+    )
+    strategy: Any = Field(
+        default=None,
+        description="Active strategy object (OptimisticStrategy, etc.)",
     )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

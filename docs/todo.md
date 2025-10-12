@@ -1,166 +1,118 @@
 # TODO: Splintercat Implementation
 
-## Immediate Next Steps
+## Current Status
 
-### Phase 2: Tool-Based Resolver
+The architecture has been simplified to focus on a minimal viable product:
+- Removed: Planner LLM, Summarizer LLM, complex recovery strategies
+- Strategy selection is now deterministic (configured by user)
+- Failure recovery is simple retry-with-error-context
+- Single LLM model handles all conflict resolution
 
-1. **Implement Layer 1 conflict tools (src/tools/conflict.py)**
-   - ViewConflictTool: Parse conflict markers, extract with context, format with line numbers
-   - ViewMoreContextTool: Extended context viewing with explicit before/after line counts
-   - ResolveConflictTool: Apply resolution (ours/theirs/both/custom), write file, stage with git
+## Simplified Architecture
 
-2. **Implement Resolver with function calling (src/model/resolver.py)**
-   - Initialize LLM agent with tool registry
-   - Build conversation loop with tool calling
-   - Handle multi-turn conversations until ResolveConflictTool is called
-   - Extract reasoning from conversation
-   - Return ResolutionResult with decision and reasoning
+**Workflow**: Initialize → ResolveConflicts → Check → [retry or next batch or finalize]
 
-### Phase 3: Strategy-Based Resolution
+**Components**:
+- One LLM model (resolver)
+- Three strategies (optimistic, batch, per_conflict) - user configured
+- Simple retry mechanism with error context
+- Four workflow nodes (Initialize, ResolveConflicts, Check, Finalize)
 
-3. **Implement workflow nodes to use existing strategy classes**
-   - Initialize node: Start git-imerge merge, verify success
-   - Resolve conflicts node: USE strategy.should_build_now() to control batching loop
-   - Build and test nodes: Use BuildRunner to execute commands
-   - Finalize node: Call imerge.finalize(), get final merge commit
+## Next Steps
 
-4. **Test end-to-end with simple merge**
-   - Use llvm-mos repository with heaven/main merge
-   - Verify conflict resolution, builds, tests, finalization
-   - Document any issues found
+### Phase 1: Implement Resolver (MVP Core)
 
-### Phase 4: Failure Handling
+1. **Implement conflict tools (src/tools/conflict.py)**
+   - ViewConflictTool: Parse conflict markers, show with context
+   - ResolveConflictTool: Apply resolution, stage with git
 
-5. **Implement Summarizer (src/model/summarizer.py)**
-   - Read and intelligently truncate large log files
-   - Extract root cause, error type, location, relevant excerpt
-   - Return BuildFailureSummary
+2. **Implement Resolver model (src/model/resolver.py)**
+   - Initialize LLM with tool registry
+   - Implement conversation loop with tool calling
+   - Pass error context on retry (from last_failed_check)
+   - Return resolution decision and reasoning
 
-6. **Implement SummarizeFailure node**
-   - Get BuildResult/TestResult with log file path
-   - Call summarizer.summarize_failure()
-   - Update state with failure_summary
-   - Log summary for user visibility
+3. **Implement ResolveConflicts node**
+   - Get conflicts from imerge.get_current_conflict()
+   - Call resolver for each conflict
+   - Respect strategy.should_check_now() for batching
+   - Track conflicts in batch for retry purposes
+   - Update conflicts_remaining from imerge state
 
-7. **Test with intentional failures**
-   - Compile error scenario
-   - Test failure scenario
-   - Link error scenario
-   - Verify summarizer correctly identifies each type
+### Phase 2: End-to-End Testing
 
-### Phase 5: Recovery System
+4. **Test with real merge**
+   - Use small merge (5-10 conflicts)
+   - Verify: conflict resolution → check → finalize
+   - Test retry on build failure
+   - Measure: time, token cost, success rate
 
-8. **Implement execute_recovery node**
-   - Get recovery decision from state
-   - Check attempts >= max_retries, abort if exceeded
-   - Select appropriate recovery class (RetryAll/RetrySpecific/Bisect/SwitchStrategy)
-   - Call recovery.execute(state) to apply recovery
-   - Reset conflicts_remaining to True
-   - Record attempt in history
+5. **Test strategy variations**
+   - Optimistic: resolve all, check once
+   - Batch (N=5): resolve 5, check, repeat
+   - Per-conflict: resolve 1, check, repeat
+   - Compare: speed vs debuggability tradeoff
 
-9. **Implement Planner (src/model/planner.py)**
-   - choose_initial_strategy(): Analyze merge scope, choose strategy, provide reasoning
-   - plan_recovery(): Analyze failure, review attempts, choose recovery approach, provide reasoning
+### Phase 3: Investigation Tools (Add as Needed)
 
-10. **Implement planning nodes**
-    - PlanStrategy node: Build MergeContext, call planner, create strategy instance
-    - PlanRecovery node: Build FailureContext, call planner, update state with decision
+6. **Add git tools only if resolver fails without them**
+   - GitShowCommitTool: View commit details
+   - GitLogTool: View file history
 
-11. **Test planner in isolation**
-    - Strategy selection with various merge contexts
-    - Recovery planning with various failure contexts
-    - Verify reasoning makes sense
+7. **Add search tools only if resolver fails without them**
+   - GrepCodebaseTool: Search repository
+   - GrepInFileTool: Search within file
 
-### Phase 6: Graph Integration
+8. **Test: Do investigation tools improve success rate?**
+   - Measure resolver accuracy with/without tools
+   - Only keep tools that demonstrably help
 
-12. **Complete all node implementations**
-    - Ensure all nodes in src/workflow/nodes/ have working implementations
-    - Verify nodes use strategy/recovery classes correctly
-    - Test state transitions through graph
+### Phase 4: Polish
 
-13. **Test full MVP**
-    - Happy path (no failures)
-    - Single failure with retry-all
-    - Multiple failures with switch-strategy
-    - max_retries exceeded scenario
-    - Different strategies (optimistic, batch, per_conflict)
-    - Different recovery strategies
+9. **Logging and observability**
+   - Log LLM calls with token counts
+   - Log resolution decisions with reasoning
+   - Log strategy batch boundaries
+   - Log retry attempts with error context
 
-### Phase 7: Additional Investigation Tools
+10. **Error handling**
+    - LLM API errors (rate limit, timeout, invalid key)
+    - git-imerge errors (unclean tree, name exists)
+    - Check command errors (timeout, command not found)
 
-14. **Implement Layer 2 git investigation tools (src/tools/git.py)**
-    - GitShowCommitTool: Get commit details and diffs
-    - GitLogTool: Show recent file history
-    - ShowMergeSummaryTool: Overall merge statistics
-    - ListAllConflictsTool: Current conflict frontier
+11. **Documentation**
+    - Update README with simplified architecture
+    - Update design.md to match implementation
+    - Update configuration.md with current fields
+    - Add example splintercat.yaml configs
 
-15. **Implement Layer 3 search tools (src/tools/search.py)**
-    - GrepCodebaseTool: Search across repository
-    - GrepInFileTool: Search within specific file
+### Phase 5: Real-World Validation
 
-16. **Update tool registry and resolver prompt**
-    - Register Layer 2 and 3 tools
-    - Update resolver prompt to explain additional tools
-
-17. **Test with conflicts requiring investigation**
-    - Refactoring conflict (moved function)
-    - Variable rename conflict
-    - Conditional feature conflict
-
-### Phase 8: Polish and Testing
-
-18. **Add comprehensive logging**
-    - LLM interactions with token counts
-    - git-imerge operations and state transitions
-    - Planner decisions with full reasoning
-    - Tool usage tracking
-    - Build/test results with duration
-    - State transitions and routing
-    - Create splintercat-decisions.log for human-readable summary
-
-19. **Add error handling**
-    - LLM API errors (rate limit, timeout, invalid key, context too large)
-    - git-imerge errors (unclean tree, name exists, internal errors)
-    - Build/test errors (timeout, command not found, disk full)
-    - File operation errors (permission denied, disk full, locked files)
-    - Ensure all errors have clear messages with fix instructions
-
-20. **Update documentation**
-    - README.md: Usage, configuration, troubleshooting
-    - config.yaml: Comprehensive inline comments
-    - Create USAGE.md: Step-by-step walkthrough
-    - Create TROUBLESHOOTING.md: Common errors and solutions
-    - Update design.md: Reflect implemented architecture
-    - Update merge-resolver.md: Document implemented tools
-
-21. **Real-world testing with LLVM merge**
-    - Setup: llvm-mos heaven/main → stable-test
-    - Monitor: strategy selection, resolutions, failures, recoveries, tool usage
-    - Collect data: time, conflicts, builds, failures, cost, tool usage patterns
-    - Validate: merge completes, build passes, tests pass, correct structure
-    - Analyze failures if any
+12. **LLVM-MOS merge test**
+    - Large merge (100+ commits, 20+ conflicts)
+    - Measure: time, cost, success rate, human intervention
+    - Identify failure modes
     - Iterate based on results
 
-22. **Performance and cost optimization (Post-MVP)**
-    - LLM cost reduction (cheaper models, prompt caching, reduced tokens)
-    - Build/test time reduction (incremental builds, test subsets)
-    - Observability (cost tracking, performance metrics, success rates)
-    - Reliability (state persistence, checkpointing, graceful shutdown)
+## Deferred Until Proven Necessary
+
+These were removed as speculative complexity. Add back only with evidence:
+- **Planner LLM**: Strategy selection is now user-configured
+- **Summarizer LLM**: Pass raw error logs to resolver on retry
+- **Complex recovery**: Only simple retry implemented
+- **Multiple check levels**: Start with one check command
 
 ## Known Issues
 
-- All LLM model classes are skeleton implementations (pass statements)
-- All workflow nodes are skeleton implementations (pass statements)
-- All tool implementations return stub strings
-- No state persistence for resume capability
-- No cost tracking yet
-- Tests are minimal (only BuildRunner has tests)
+- Resolver model is stub (pass statements)
+- ResolveConflicts node is stub
+- No tool implementations yet
+- No tests beyond CheckRunner
+- No cost tracking
 
-## Architecture Reminders
+## Architecture
 
-- Nodes are coordinators that USE strategy/recovery classes, don't reimplement logic
-- Strategy classes control resolution batching via should_build_now()
-- Recovery classes handle failures via execute()
-- ToolRegistry provides all tools to LLM via function calling
-- State flows through graph, nodes update it
-- Pydantic AI Graph handles routing, nodes just implement logic
+- Initialize: Start imerge, create strategy from config
+- ResolveConflicts: Call resolver until strategy says check
+- Check: Run checks, on failure retry with error context
+- Finalize: Call imerge.finalize() to create merge commit

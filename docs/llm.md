@@ -40,7 +40,7 @@ The llvm-mos repository has multiple remotes for testing:
 - **NO EMOJIS** - Do not use emojis anywhere in code, comments, docstrings, commit messages, or markdown files
 - Use ruff - Run ruff check after major changes and make sure to clean up any problems
 
-- **WRITE THE LEAST AMOUNT OF CODE POSSIBLE** - Much of the functionality we need already exists in Pydantic or other python libraries.  USE THEM.  Do not reinvent the wheel.
+- **WRITE THE LEAST AMOUNT OF CODE POSSIBLE** - Much of the functionality we need already exists in Pydantic or other python libraries.  USE THEM.  Do not reinvent the wheel.  Especially, do not be afraid of deleting code! Removing dead or unclear code from this design is Zen engineering and we like it.
 
 - Document code flow using debug messages.  We use a simple wrapper around logfire in log.py. Do not refer to logfire directly in the code. Use spans when documenting long-running processes and complex sequences.
 

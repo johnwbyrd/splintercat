@@ -30,9 +30,6 @@ class MergeCommand(BaseModel):
             f"into {state.config.git.target_branch}"
         )
 
-        # Set current command in global state
-        state.runtime.global_.current_command = "merge"
-
         # Create workflow graph
         from splintercat.workflow.graph import create_workflow
         from splintercat.workflow.nodes.initialize import Initialize

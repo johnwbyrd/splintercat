@@ -163,9 +163,8 @@ def test_defaults_lowest_priority(fixtures_dir):
     assert data["config"]["strategy"]["max_retries"] == 99
 
     # But defaults still present for non-overridden values
-    assert "available" in data["config"]["strategy"]
-    expected = ["optimistic", "batch", "per_conflict"]
-    assert data["config"]["strategy"]["available"] == expected
+    assert "name" in data["config"]["strategy"]
+    assert data["config"]["strategy"]["name"] == "batch"
 
 
 def test_list_replacement_not_merge(fixtures_dir):

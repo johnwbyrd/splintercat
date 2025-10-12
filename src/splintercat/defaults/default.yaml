@@ -9,6 +9,6 @@ include:
 config:
   # Default strategy settings
   strategy:
+    name: batch
+    batch_size: 10
     max_retries: 3
-    available: [optimistic, batch, per_conflict]
-    default_batch_size: 10

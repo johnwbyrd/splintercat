@@ -4,7 +4,7 @@
 class Resolver:
     """LLM model for resolving merge conflicts.
 
-    Uses a cheap/fast model to mechanically resolve conflicts.
+    Uses a model to resolve conflicts.
     """
 
     def __init__(self, model: str, api_key: str, base_url: str):
