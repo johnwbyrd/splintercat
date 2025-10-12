@@ -1,0 +1,6 @@
+# Extra commands to be included
+config:
+  commands:
+    custom:
+      test_cmd: "echo custom"
+      another_cmd: "echo another"

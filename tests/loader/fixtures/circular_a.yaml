@@ -1,0 +1,23 @@
+# Creates circular include with circular_b.yaml
+include: circular_b.yaml
+
+config:
+  git:
+    source_ref: test/a
+    target_workdir: /tmp/test
+    target_branch: main
+    imerge_name: test-merge
+    imerge_goal: merge
+
+  check:
+    output_dir: /tmp/logs
+    default_timeout: 300
+    commands:
+      quick: "echo a"
+
+  llm:
+    api_key: test-key
+    base_url: https://test.com
+    resolver_model: test/model
+    summarizer_model: test/model
+    planner_model: test/model

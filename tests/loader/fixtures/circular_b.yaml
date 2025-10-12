@@ -1,0 +1,7 @@
+# Creates circular include with circular_a.yaml
+include: circular_a.yaml
+
+config:
+  check:
+    commands:
+      quick: "echo b"

@@ -1,0 +1,23 @@
+# Includes file that itself has includes
+include: with_include.yaml
+
+config:
+  git:
+    source_ref: nested/branch
+    target_workdir: /tmp/nested
+    target_branch: main
+    imerge_name: nested-merge
+    imerge_goal: merge
+
+  check:
+    output_dir: /tmp/logs
+    default_timeout: 300
+    commands:
+      quick: "echo nested"
+
+  llm:
+    api_key: test-key
+    base_url: https://test.com
+    resolver_model: test/model
+    summarizer_model: test/model
+    planner_model: test/model

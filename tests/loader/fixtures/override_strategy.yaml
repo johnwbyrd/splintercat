@@ -1,0 +1,9 @@
+# Overrides strategy settings
+config:
+  strategy:
+    max_retries: 99
+    default_batch_size: 42
+
+  commands:
+    git:
+      log: "git log --graph"  # Override default

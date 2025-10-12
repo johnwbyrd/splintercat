@@ -1,0 +1,23 @@
+# Config that includes another file
+include: extra_commands.yaml
+
+config:
+  git:
+    source_ref: test/branch
+    target_workdir: /tmp/test
+    target_branch: main
+    imerge_name: test-merge
+    imerge_goal: merge
+
+  check:
+    output_dir: /tmp/logs
+    default_timeout: 300
+    commands:
+      quick: "echo test"
+
+  llm:
+    api_key: test-key
+    base_url: https://test.com
+    resolver_model: test/model
+    summarizer_model: test/model
+    planner_model: test/model
