@@ -28,7 +28,7 @@ class Reset(BaseNode[State]):
         runner = Runner()
 
         # Get existing merge names
-        existing_merges = self._get_existing_merges(runner, workdir)
+        existing_merges = self._get_existing_merges(runner, workdir, ctx.state)
         if not existing_merges:
             logger.warning("No git-imerge merges found to reset")
             return End(None)
@@ -42,7 +42,7 @@ class Reset(BaseNode[State]):
 
         # Perform reset - deletes all imerge refs in one atomic
         # operation
-        self._reset_all_merges(runner, workdir)
+        self._reset_all_merges(runner, workdir, ctx.state)
 
         # Update state
         ctx.state.runtime.reset.merge_names_found = existing_merges
@@ -55,12 +55,15 @@ class Reset(BaseNode[State]):
         )
         return End(None)
 
-    def _get_existing_merges(self, runner: Runner, workdir) -> list[str]:
+    def _get_existing_merges(
+        self, runner: Runner, workdir, state: State
+    ) -> list[str]:
         """Get list of all existing imerge merge names."""
         logger.info(f"Looking for imerge refs in: {workdir}")
         try:
+            cmd = state.config.commands["git"]["for_each_ref_list"]
             result = runner.execute(
-                "git for-each-ref --format='%(refname:short)' refs/imerge",
+                cmd.format(refspec="refs/imerge"),
                 cwd=workdir,
                 check=True,
             )
@@ -99,16 +102,17 @@ class Reset(BaseNode[State]):
         self,
         runner: Runner,
         workdir,
-        merge_name: str
+        merge_name: str,
+        state: State,
     ) -> list[str]:
         """Get all refs for a specific merge."""
         logger.debug(f"Getting refs for merge: {merge_name}")
         try:
             # Use prefix matching, not glob - git for-each-ref
             # matches all refs with this prefix
+            cmd = state.config.commands["git"]["for_each_ref_by_prefix"]
             result = runner.execute(
-                f"git for-each-ref --format='%(refname)' "
-                f"refs/imerge/{merge_name}/",
+                cmd.format(refspec=f"refs/imerge/{merge_name}/"),
                 cwd=workdir,
                 check=True,
             )
@@ -141,7 +145,7 @@ class Reset(BaseNode[State]):
         )
         return False
 
-    def _reset_all_merges(self, runner: Runner, workdir):
+    def _reset_all_merges(self, runner: Runner, workdir, state: State):
         """Reset all imerge state by deleting all refs.
 
         Uses git pipeline approach from Stack Overflow:
@@ -161,9 +165,9 @@ class Reset(BaseNode[State]):
         # delete refs/imerge/name/path. These are piped to
         # update-ref --stdin which executes all deletions
         # together
+        cmd = state.config.commands["git"]["for_each_ref_delete"]
         runner.execute(
-            "git for-each-ref --format='delete %(refname)' "
-            "refs/imerge/ | git update-ref --stdin",
+            cmd.format(refspec="refs/imerge/"),
             cwd=workdir,
             check=True,
         )

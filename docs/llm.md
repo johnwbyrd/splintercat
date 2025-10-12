@@ -20,7 +20,10 @@ source ../.venv/bin/activate
 pytest                    # All tests
 pytest tests/test_checkrunner.py -v  # Just CheckRunner
 ruff check                # Linting
+pytest -v                 # Checking
 ```
+
+Run ruff check and pytest -v after every major change, and fix problems.
 
 ## Git Repository Structure
 
@@ -38,6 +41,8 @@ The llvm-mos repository has multiple remotes for testing:
 - Use ruff - Run ruff check after major changes and make sure to clean up any problems
 
 - **WRITE THE LEAST AMOUNT OF CODE POSSIBLE** - Much of the functionality we need already exists in Pydantic or other python libraries.  USE THEM.  Do not reinvent the wheel.
+
+- Document code flow using debug messages.  We use a simple wrapper around logfire in log.py. Do not refer to logfire directly in the code. Use spans when documenting long-running processes and complex sequences.
 
 ## Documentation Style
 

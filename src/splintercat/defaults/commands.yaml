@@ -3,24 +3,13 @@
 
 config:
   commands:
-    # Git commands
+    # Git commands used by reset workflow
     git:
+      # List all refs matching refspec with short names (imerge/NAME/...)
       for_each_ref_list: "git for-each-ref --format='%(refname:short)' {refspec}"
+
+      # Get full ref names (refs/imerge/NAME/...) matching a prefix
+      for_each_ref_by_prefix: "git for-each-ref --format='%(refname)' {refspec}"
+
+      # Delete all refs matching refspec atomically via git update-ref --stdin
       for_each_ref_delete: "git for-each-ref --format='delete %(refname)' {refspec} | git update-ref --stdin"
-      show_commit: "git -C {workdir} show --format='%H%n%an%n%ae%n%at%n%s%n%b' --no-patch {ref}"
-      log: "git -C {workdir} log --oneline -n {count} {path}"
-      diff: "git -C {workdir} diff {ref1} {ref2} -- {path}"
-      fetch: "git -C {workdir} fetch {repo} {branch}"
-      merge_base: "git -C {workdir} merge-base HEAD FETCH_HEAD"
-      list_commits: "git -C {workdir} rev-list --reverse {merge_base}..FETCH_HEAD{limit_flag}"
-      check_clean: "git -C {workdir} diff-index --quiet HEAD --"
-      checkout: "git -C {workdir} checkout {branch_flags} {branch} {base_ref}"
-      get_state: "git -C {workdir} rev-parse HEAD"
-      cherry_pick: "git -C {workdir} cherry-pick {commit}"
-      cherry_pick_abort: "git -C {workdir} cherry-pick --abort"
-      cherry_pick_continue: "git -C {workdir} cherry-pick --continue"
-      cherry_pick_skip: "git -C {workdir} cherry-pick --skip"
-      add: "git -C {workdir} add -A"
-      commit: "git -C {workdir} commit -m '{message}'"
-      reset_hard: "git -C {workdir} reset --hard {state}"
-      clean: "git -C {workdir} clean -fd"
