@@ -263,10 +263,10 @@ class StreamCapture(TextIOBase):
             # Log all complete lines
             for line in lines[:-1]:
                 if line:  # Skip empty lines
-                    logger.debug(
-                        f"git-imerge {self.stream_name}",
-                        message=line,
-                    )
+                    # Log the actual git-imerge message as the main text
+                    # stream indicates whether it came from stdout or
+                    # stderr
+                    logger.info(line, stream=self.stream_name)
 
             # Keep incomplete last line in buffer
             self._buffer = [lines[-1]] if lines[-1] else []
@@ -288,9 +288,10 @@ class StreamCapture(TextIOBase):
         if self._buffer:
             incomplete = ''.join(self._buffer)
             if incomplete:
+                # Log incomplete line at trace level
                 logger.trace(
-                    f"git-imerge {self.stream_name}",
-                    message=incomplete,
+                    incomplete,
+                    stream=self.stream_name,
                     incomplete=True,
                 )
             self._buffer = []

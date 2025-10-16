@@ -1,5 +1,7 @@
 """Command execution tools for conflict resolution."""
 
+import shlex
+
 from pydantic_ai import RunContext
 from pydantic_ai.exceptions import ModelRetry
 
@@ -68,15 +70,6 @@ def run_command(
             f"Use list_allowed_commands() for full details."
         )
 
-    # Validate arguments don't contain shell metacharacters
-    for arg in args:
-        for metachar in SHELL_METACHARACTERS:
-            if metachar in arg:
-                raise ModelRetry(
-                    f"Argument contains unsafe character '{metachar}': {arg}\n"
-                    f"Shell metacharacters are not allowed for security."
-                )
-
     # For git, validate subcommand
     if command == 'git':
         if not args:
@@ -94,9 +87,11 @@ def run_command(
             )
 
     # Build command string (runner takes string, not list)
-    # Args are already validated against shell metacharacters
+    # Use shlex.quote to properly escape each argument
+    # This allows special characters in arguments (like | in grep
+    # patterns) while preventing shell injection
     cmd_parts = [command] + args
-    cmd_string = ' '.join(cmd_parts)
+    cmd_string = ' '.join(shlex.quote(part) for part in cmd_parts)
 
     # Run command in workspace directory with timeout
     runner = Runner()

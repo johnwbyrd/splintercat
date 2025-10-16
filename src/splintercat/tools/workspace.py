@@ -38,7 +38,8 @@ def read_file(
     ctx: RunContext[Workspace],
     filepath: str,
     start_line: int = 1,
-    num_lines: int = 50
+    num_lines: int = 50,
+    confirm_large: bool = False
 ) -> str:
     """Read file with line numbers.
 
@@ -47,6 +48,8 @@ def read_file(
         start_line: First line to read (1-indexed)
         num_lines: Number of lines to read (default 50, use -1
             for entire file)
+        confirm_large: Confirm reading >200 lines (required for
+            large reads)
 
     Returns:
         File content with line numbers: "1: content\\n2: content\\n..."
@@ -69,15 +72,31 @@ def read_file(
         raise ModelRetry(f"Failed to read '{filepath}': {e}") from e
 
     lines = content.splitlines()
+    total_lines = len(lines)
 
     # Determine which lines to show
     if num_lines == -1:
         # Show entire file
         selected_lines = lines[start_line - 1:]
+        lines_to_read = len(selected_lines)
     else:
         # Show specified range
         end_line = start_line + num_lines - 1
         selected_lines = lines[start_line - 1:end_line]
+        lines_to_read = num_lines
+
+    # Check if reading large amount and require confirmation
+    if lines_to_read > 200 and not confirm_large:
+        raise ModelRetry(
+            f"File '{filepath}' has {total_lines} total lines. "
+            f"You requested {lines_to_read} lines. "
+            f"Reading >200 lines uses significant tokens. "
+            f"If you really need this, call read_file with "
+            f"confirm_large=True. "
+            f"Consider: read specific sections, use grep to find "
+            f"relevant parts, or use git show :2:/:3: for conflict "
+            f"versions."
+        )
 
     # Format with line numbers
     output = []
@@ -90,22 +109,45 @@ def read_file(
 def write_file(
     ctx: RunContext[Workspace],
     filepath: str,
-    content: str
+    content: str,
+    confirm_large: bool = False
 ) -> str:
     """Create or completely replace a file.
+
+    IMPORTANT: For large files (>200 lines), use concatenate_to_file
+    or git commands instead. Writing entire large files wastes tokens.
 
     Args:
         filepath: Path to file (relative to workspace)
         content: File content to write
+        confirm_large: Confirm writing >200 lines (required for
+            large writes)
 
     Returns:
         Confirmation message with file size
 
     Raises:
-        ModelRetry: If file cannot be written
+        ModelRetry: If file cannot be written or content too large
     """
     workspace = ctx.deps
     file_path = workspace.workdir / filepath
+
+    # Check content size to prevent token waste
+    line_count = len(content.splitlines())
+    if line_count > 200 and not confirm_large:
+        raise ModelRetry(
+            f"Content has {line_count} lines. Writing >200 lines "
+            f"wastes tokens. "
+            f"Better approaches:\n"
+            f"1. Use concatenate_to_file() to build from sections\n"
+            f"2. Use git show :2:path or :3:path as base, then edit\n"
+            f"3. Use git checkout --ours/--theirs path to select "
+            f"version\n"
+            f"4. For small edits, read the file, modify specific "
+            f"sections\n"
+            f"If you really must write this much, call write_file "
+            f"with confirm_large=True."
+        )
 
     # Create parent directories if needed
     file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -116,7 +158,6 @@ def write_file(
         raise ModelRetry(f"Failed to write '{filepath}': {e}") from e
 
     byte_count = len(content.encode('utf-8'))
-    line_count = len(content.splitlines())
     return f"Wrote {byte_count} bytes ({line_count} lines) to {filepath}"
 
 

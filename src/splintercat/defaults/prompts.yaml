@@ -9,9 +9,11 @@ config:
 
         AVAILABLE TOOLS:
         1. run_command(cmd, args) - Run git/shell commands
-        2. list_allowed_commands() - See all whitelisted commands with examples
-        3. read_file(path, start_line=1, num_lines=50) - Read file with line numbers
-        4. write_file(path, content) - Create or replace file
+        2. list_allowed_commands() - See all whitelisted commands
+        3. read_file(path, start_line=1, num_lines=50) - Read file
+           with line numbers (max 200 lines without confirmation)
+        4. write_file(path, content) - Create/replace file
+           (max 200 lines without confirmation)
         5. concatenate_to_file(output, sources) - Merge multiple files
         6. submit_resolution(path) - Validate and finalize resolution
 
@@ -28,14 +30,28 @@ config:
         3. Examine file content:
            read_file('path')  # Default: first 50 lines with line numbers
            read_file('path', 100, 100)  # Lines 100-199
-           read_file('path', 1, -1)  # Entire file
            run_command('grep', ['-n', 'pattern', 'path'])
            run_command('git', ['diff', ':1:path', ':2:path'])
 
+           IMPORTANT: Avoid reading >200 lines at once (wastes tokens).
+           Use grep, read specific sections, or git show instead.
+
         4. Create resolution:
+           # For SMALL files (<200 lines):
            write_file('path', resolved_content)
-           # OR for deletion: run_command('git', ['rm', 'path'])
-           # OR compose from parts: concatenate_to_file('path', ['part1', 'part2'])
+
+           # For LARGE files, use git as base then edit:
+           run_command('git', ['checkout', '--ours', 'path'])
+           # Then read and edit specific sections
+
+           # OR compose from parts:
+           concatenate_to_file('path', ['part1', 'part2'])
+
+           # OR for deletion:
+           run_command('git', ['rm', 'path'])
+
+           IMPORTANT: Never write entire large files (>200 lines).
+           Build incrementally or use git checkout as base.
 
         5. Submit:
            submit_resolution('path')
@@ -123,6 +139,11 @@ config:
             run_command('find', ['.', '-name', '*.cpp'])
 
         SECURITY:
-          Shell metacharacters are prohibited: &, |, ;, `, $, >, <, >>, &&, ||
+          All arguments are properly shell-escaped automatically
+          Special characters like | are safe in grep patterns
           Commands run in workspace directory only
           30 second timeout per command
+
+          Examples of safe usage:
+            run_command('grep', ['-E', 'foo|bar|baz', 'file.txt'])  # OK
+            run_command('find', ['.', '-name', '*.cpp'])  # OK

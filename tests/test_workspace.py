@@ -313,3 +313,71 @@ def test_complete_resolution_workflow(mock_ctx, temp_workspace):
     final_content = (temp_workspace.workdir / "conflict.py").read_text()
     assert final_content == resolved
     assert "<<<<<<< HEAD" not in final_content
+
+
+def test_read_file_large_requires_confirmation(mock_ctx, temp_workspace):
+    """Test that reading >200 lines requires confirmation."""
+    # Create a large file
+    large_content = "\n".join(f"line {i}" for i in range(300))
+    (temp_workspace.workdir / "large.py").write_text(large_content)
+
+    # Should fail without confirmation
+    with pytest.raises(ModelRetry, match="200 lines"):
+        read_file(mock_ctx, "large.py", num_lines=250)
+
+    # Should succeed with confirmation
+    result = read_file(
+        mock_ctx,
+        "large.py",
+        num_lines=250,
+        confirm_large=True
+    )
+    assert "1: line 0" in result
+    assert "250: line 249" in result
+
+
+def test_read_file_entire_large_requires_confirmation(
+    mock_ctx, temp_workspace
+):
+    """Test that reading entire large file requires confirmation."""
+    # Create a large file
+    large_content = "\n".join(f"line {i}" for i in range(300))
+    (temp_workspace.workdir / "large.py").write_text(large_content)
+
+    # Should fail for num_lines=-1 without confirmation
+    with pytest.raises(ModelRetry, match="200 lines"):
+        read_file(mock_ctx, "large.py", num_lines=-1)
+
+    # Should succeed with confirmation
+    result = read_file(
+        mock_ctx,
+        "large.py",
+        num_lines=-1,
+        confirm_large=True
+    )
+    assert "1: line 0" in result
+
+
+def test_write_file_large_requires_confirmation(mock_ctx, temp_workspace):
+    """Test that writing >200 lines requires confirmation."""
+    # Create large content
+    large_content = "\n".join(f"line {i}" for i in range(250))
+
+    # Should fail without confirmation
+    with pytest.raises(ModelRetry, match="200 lines"):
+        write_file(mock_ctx, "large.py", large_content)
+
+    # Should succeed with confirmation
+    result = write_file(
+        mock_ctx,
+        "large.py",
+        large_content,
+        confirm_large=True
+    )
+    assert "Wrote" in result
+    assert "250 lines" in result
+
+    # Verify file was written
+    written_path = temp_workspace.workdir / "large.py"
+    assert written_path.exists()
+    assert "line 249" in written_path.read_text()
