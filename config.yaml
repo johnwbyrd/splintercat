@@ -46,16 +46,11 @@ config:
   # LLM - Language model configuration
   # ==============================================================================
   llm:
-    # OpenRouter API key
-    # Best practice: Set via .env file or environment variable
-    # .env file: LLM__API_KEY=sk-...
-    # Env var: SPLINTERCAT__CONFIG__LLM__API_KEY=sk-...
-    api_key: ""  # Will be loaded from .env or environment
-
-    # OpenRouter API base URL
-    base_url: https://openrouter.ai/api/v1
-
-    # Model for conflict resolution
+    # Model for conflict resolution.  Model name should be in Pydantic AI format,
+    # which is provider:model .  See https://ai.pydantic.dev/models/ for a list 
+    # of supported providers.  See your provider for a list of available models.
+    # Your particular provider will probably require an API key, which you can
+    # set in the environment variable for that provider (e.g. OPENAI_API_KEY).
     model: openrouter:x-ai/grok-code-fast-1
 
   # ==============================================================================
@@ -87,13 +82,11 @@ config:
 #
 # - Environment variables can override any setting using double underscore delimiter:
 #   Examples:
-#     SPLINTERCAT__CONFIG__LLM__API_KEY=sk-your-key-here
 #     SPLINTERCAT__CONFIG__VERBOSE=true
 #     SPLINTERCAT__CONFIG__STRATEGY__MAX_RETRIES=10
 #
 # - Command-line args can override settings:
 #   Examples:
-#     --config.llm.planner_model=anthropic/claude-opus-4
 #     --config.verbose=true
 #     --config.strategy.max_retries=10
 #

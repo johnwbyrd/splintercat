@@ -79,8 +79,6 @@ config:
     commands:
       quick: "echo test"
   llm:
-    api_key: test-key
-    base_url: https://test.com
     resolver_model: test/model
     summarizer_model: test/model
     planner_model: test/model
@@ -130,8 +128,6 @@ config:
     commands:
       quick: "echo test"
   llm:
-    api_key: test-key
-    base_url: https://test.com
     resolver_model: test/model
     summarizer_model: test/model
     planner_model: test/model

@@ -63,16 +63,10 @@ config:
     max_retries: 3
 ```
 
-Create a `.env` file for your API key:
+Create a `.env` file for your API key.  See https://ai.pydantic.dev/models/openai/ for a list of supported providers and required API key environment variable names:
 
 ```
-SPLINTERCAT_CONFIG__LLM__API_KEY=your-key-here
-```
-
-Or set it as an environment variable:
-
-```bash
-export SPLINTERCAT_CONFIG__LLM__API_KEY=your-key-here
+YOURPROVIDER_API_KEY=your-key-here
 ```
 
 Run the merge:
@@ -101,7 +95,6 @@ Key settings:
 - `config.git.source_ref`: What branch to merge from
 - `config.git.target_branch`: What branch to merge into
 - `config.check.commands`: Your build/test commands
-- `config.llm.api_key`: OpenRouter or OpenAI API key (set via environment variable)
 - `config.llm.model`: LLM model for conflict resolution (e.g., openai/gpt-4o)
 - `config.strategy.name`: Strategy (optimistic, batch, or per_conflict)
 - `config.strategy.batch_size`: How many conflicts to resolve before checking

@@ -91,16 +91,6 @@ class CheckConfig(BaseConfig):
 
 class LLMConfig(BaseConfig):
     """LLM provider and model selection."""
-
-    api_key: str = Field(
-        description=(
-            "API key for LLM provider "
-            "(best practice: set via .env or environment variable)"
-        )
-    )
-    base_url: str = Field(
-        description="LLM API base URL (e.g., https://openrouter.ai/api/v1)"
-    )
     model: str = Field(
         description=(
             "Model for conflict resolution "

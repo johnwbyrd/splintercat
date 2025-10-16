@@ -16,8 +16,6 @@ config:
       quick: "echo nested"
 
   llm:
-    api_key: test-key
-    base_url: https://test.com
     resolver_model: test/model
     summarizer_model: test/model
     planner_model: test/model
