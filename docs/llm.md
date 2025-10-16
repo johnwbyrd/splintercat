@@ -4,7 +4,7 @@ The following constitute instructions for Claude, OpenAI, Cline, and other LLM-b
 
 ## Code Style
 
-- **SCREW BACKWARDS COMPATIBILITY** - Do NOT engineer for backwards compatibility.  BREAK AND REWRITE CODE TOTALLY FROM SCRATCH IF NEEDED, using a superior design and structure.  There are NO existing users.  Doing something "for backward compatibility" is an anti-pattern.
+- **SCREW BACKWARDS COMPATIBILITY** - Do NOT engineer for backwards compatibility.  BREAK AND REWRITE CODE TOTALLY FROM SCRATCH IF NEEDED, using a superior design and structure.  There are NO existing users.  Doing something "for backwards compatibility" is an anti-pattern.
 
 - **NO EMOJIS** - Do not use emojis anywhere in code, comments, docstrings, commit messages, or markdown files
 

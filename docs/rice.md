@@ -77,7 +77,7 @@ The benchmark has no way to know which is correct. It just measures textual matc
 
 ## The Infinite Set Problem
 
-For any non-trivial conflict, there are infinitely many textually distinct resolutions that are semantically equivalent:
+For any non-trivial conflict, there are many textually distinct resolutions that are semantically equivalent:
 
 ```python
 # Resolution 1
@@ -92,7 +92,7 @@ result = value if condition else None
 return result
 ```
 
-These are all equivalent. A benchmark based on textual similarity will mark two of them wrong. But they're all correct.
+A benchmark based on textual similarity will mark two of them wrong. But they're all correct.
 
 Academic benchmarks optimize for matching one specific syntactic form, not for semantic correctness.
 
@@ -137,7 +137,7 @@ If you train an LLM to maximize textual similarity to human resolutions in Confl
 - Performance on benchmark improves
 - Performance on real merges may degrade
 
-This is **Goodhart's Law**: "When a measure becomes a target, it ceases to be a good measure."
+**Goodhart's Law**: "When a measure becomes a target, it ceases to be a good measure."
 
 ### Benchmarks Without Build Systems Are Incomplete
 
@@ -185,48 +185,6 @@ Splintercat implements this approach:
 
 This is theoretically grounded (avoids Rice's Theorem trap) and practically effective (measures what matters).
 
-## Call to Action for Research Community
-
-### Stop Publishing Misleading Accuracy Numbers
-
-"95% accuracy on ConflictBench" is not a useful metric. It measures textual similarity to one possible resolution, not correctness of the merge.
-
-**Better metrics**:
-- Percentage of resolutions that compile
-- Percentage that pass existing tests
-- Percentage that introduce no regressions
-- Cost in time/tokens to achieve success
-
-### Build Benchmarks with Build Systems
-
-A useful merge conflict benchmark must include:
-1. Conflict scenarios (current benchmarks have this)
-2. Complete build systems for each project
-3. Test suites that validate behavior
-4. Clear success criteria (tests pass)
-
-Without these, you can only measure syntactic validity, not semantic correctness.
-
-### Acknowledge Rice's Theorem Applies
-
-Research papers should acknowledge:
-1. "Correct merge" is undecidable in general
-2. Multiple resolutions can be correct
-3. Human resolution is not unique ground truth
-4. Textual similarity is a poor proxy for correctness
-
-Stop treating merge conflict resolution as if it has deterministic ground truth when it fundamentally doesn't.
-
-### Evaluate on Real Merges
-
-The ultimate test: Does your tool successfully merge real branches from real projects where:
-- Both branches have substantial commits
-- Conflicts are non-trivial
-- Build systems and tests exist
-- Failure has real consequences
-
-Academic benchmarks are useful for iteration speed, but real-world validation is required.
-
 ## Conclusion
 
 Merge conflict research has been optimizing for the wrong objective function. By measuring textual similarity to human resolutions, benchmarks:
@@ -242,8 +200,6 @@ The correct approach:
 4. Measure improvement on real merges with real build systems
 
 Splintercat's architecture (incremental merge + build validation + retry with error context) is grounded in this understanding. It doesn't try to match human text patterns. It tries to produce working software, validated by the only oracle that matters: the build system and test suite.
-
-This is not just a better engineering approach. It's the theoretically correct approach given Rice's Theorem.
 
 ## References
 
