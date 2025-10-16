@@ -78,6 +78,7 @@ class ResolveConflicts(BaseNode[State]):
                 resolution = await resolve_workspace(
                     workspace,
                     model=ctx.state.config.llm.model,
+                    api_key=ctx.state.config.llm.api_key,
                     failure_context=failure_context,
                 )
 

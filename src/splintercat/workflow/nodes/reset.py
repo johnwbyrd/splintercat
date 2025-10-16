@@ -179,28 +179,38 @@ class Reset(BaseNode[State]):
 
         # Abort any in-progress merge (e.g., git merge, git imerge)
         logger.info("Aborting any in-progress merge...")
+        cmd = state.config.commands["git"]["merge_abort"]
         runner.execute(
-            "git merge --abort", cwd=workdir, check=False
+            cmd, cwd=workdir, check=False
         )
 
         # Discard all changes in working tree and staging area
         logger.info("Hard resetting working tree...")
-        runner.execute("git reset --hard", cwd=workdir, check=True)
+        cmd = state.config.commands["git"]["reset_hard"]
+        runner.execute(cmd, cwd=workdir, check=True)
 
         # Remove all untracked files and directories
         logger.info("Cleaning untracked files...")
-        runner.execute("git clean -fd", cwd=workdir, check=True)
+        cmd = state.config.commands["git"]["clean_untracked"]
+        runner.execute(cmd, cwd=workdir, check=True)
 
         # Delete target branch (fails silently if doesn't exist)
         logger.info(f"Deleting branch {target}...")
+        cmd = state.config.commands["git"]["branch_delete"].format(
+            branch=target
+        )
         runner.execute(
-            f"git branch -D {target}", cwd=workdir, check=False
+            cmd, cwd=workdir, check=False
         )
 
         # Create target branch from source ref (or reset if exists)
         logger.info(f"Creating {target} from {source}...")
+        cmd = state.config.commands["git"]["checkout_branch"].format(
+            target=target,
+            source=source
+        )
         runner.execute(
-            f"git checkout -B {target} {source}",
+            cmd,
             cwd=workdir,
             check=True,
         )

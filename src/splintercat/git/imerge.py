@@ -1,6 +1,7 @@
 """Wrapper around git-imerge library."""
 
 import os
+from contextlib import suppress
 from pathlib import Path
 
 import gitimerge
@@ -12,17 +13,21 @@ from splintercat.git.shim import capture_gitimerge_output
 class IMerge:
     """Wrapper for git-imerge operations using the Python API."""
 
-    def __init__(self, workdir: Path, name: str, goal: str = "merge"):
+    def __init__(
+        self, workdir: Path, name: str, goal: str = "merge", config=None
+    ):
         """Initialize git-imerge wrapper.
 
         Args:
             workdir: Path to git repository
             name: Name for this imerge operation
             goal: Merge goal (merge, rebase, etc.)
+            config: Configuration object with commands templates
         """
         self.workdir = workdir
         self.name = name
         self.goal = goal
+        self.config = config
         self.git = None
         self.merge_state = None
 
@@ -31,6 +36,64 @@ class IMerge:
         os.chdir(str(workdir))
         self.git = gitimerge.GitRepository()
         self.runner = Runner()
+
+    @classmethod
+    def exists(cls, workdir: Path, name: str) -> bool:
+        """Check if an imerge with given name exists.
+
+        Args:
+            workdir: Path to git repository
+            name: Name of imerge to check
+
+        Returns:
+            True if imerge exists, False otherwise
+        """
+        original_dir = os.getcwd()
+        try:
+            os.chdir(str(workdir))
+            git = gitimerge.GitRepository()
+            return git.check_imerge_exists(name)
+        finally:
+            os.chdir(original_dir)
+
+    def load_existing(self):
+        """Load existing imerge state instead of starting new merge.
+
+        Cleans up any pending merge from previous interrupted
+        session before loading state.
+
+        Raises:
+            ValueError: If imerge does not exist
+        """
+        if not self.git:
+            raise ValueError("GitRepository not initialized")
+
+        # Clean up any pending merge from previous interrupted
+        # session
+        # This is equivalent to "git merge --abort" that git-imerge
+        # docs recommend
+        if self.config:
+            with suppress(Exception):
+                cmd = self.config.commands["git"]["merge_abort"]
+                self.runner.execute(
+                    cmd,
+                    cwd=self.workdir,
+                    check=False,  # Don't error if no merge
+                )
+
+            # If merge --abort fails, try reset --merge
+            with suppress(Exception):
+                cmd = self.config.commands["git"]["reset_merge"]
+                self.runner.execute(
+                    cmd,
+                    cwd=self.workdir,
+                    check=False,
+                )
+
+        with capture_gitimerge_output():
+            self.merge_state = gitimerge.MergeState.read(
+                self.git, self.name
+            )
 
     def start_merge(self, source_ref: str, target_branch: str):
         """Start an incremental merge.
@@ -103,8 +166,12 @@ class IMerge:
             self.merge_state.request_user_merge(i1, i2)
 
         # Get conflicted files from git status
+        if self.config:
+            cmd = self.config.commands["git"]["diff_conflicted_files"]
+        else:
+            cmd = "git diff --name-only --diff-filter=U"
         result = self.runner.execute(
-            "git diff --name-only --diff-filter=U",
+            cmd,
             cwd=self.workdir,
             check=False,
         )
@@ -142,8 +209,14 @@ class IMerge:
         Args:
             filepath: Path to file relative to workdir
         """
+        if self.config:
+            cmd = self.config.commands["git"]["add_file"].format(
+                filepath=filepath
+            )
+        else:
+            cmd = f"git add {filepath}"
         self.runner.execute(
-            f"git add {filepath}",
+            cmd,
             cwd=self.workdir,
             check=True,
         )

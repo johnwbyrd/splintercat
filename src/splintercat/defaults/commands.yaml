@@ -13,3 +13,27 @@ config:
 
       # Delete all refs matching refspec atomically via git update-ref --stdin
       for_each_ref_delete: "git for-each-ref --format='delete %(refname)' {refspec} | git update-ref --stdin"
+
+      # Abort an in-progress merge
+      merge_abort: "git merge --abort"
+
+      # Reset to resolve merge conflicts
+      reset_merge: "git reset --merge"
+
+      # Hard reset working tree and staging area
+      reset_hard: "git reset --hard"
+
+      # Remove all untracked files and directories
+      clean_untracked: "git clean -fd"
+
+      # List files with unresolved conflicts
+      diff_conflicted_files: "git diff --name-only --diff-filter=U"
+
+      # Stage a resolved file
+      add_file: "git add {filepath}"
+
+      # Delete a branch (force)
+      branch_delete: "git branch -D {branch}"
+
+      # Create or reset branch to point at source
+      checkout_branch: "git checkout -B {target} {source}"

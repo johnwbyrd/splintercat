@@ -33,26 +33,25 @@ class Initialize(BaseNode[State]):
         imerge = IMerge(
             workdir=workdir,
             name=ctx.state.config.git.imerge_name,
-            goal=ctx.state.config.git.imerge_goal
+            goal=ctx.state.config.git.imerge_goal,
+            config=ctx.state.config
         )
 
-        # Start git-imerge merge operation
-        try:
+        # Check if merge already exists and load it, otherwise
+        # start new
+        imerge_name = ctx.state.config.git.imerge_name
+        is_resuming = IMerge.exists(workdir, imerge_name)
+
+        if is_resuming:
+            logger.info(
+                f"Resuming existing imerge '{imerge_name}'"
+            )
+            imerge.load_existing()
+        else:
+            logger.info(
+                f"Starting new imerge '{imerge_name}'"
+            )
             imerge.start_merge(source_ref, target_branch)
-        except Exception as e:
-            error_str = str(e)
-            if "already in use" in error_str:
-                imerge_name = ctx.state.config.git.imerge_name
-                raise ValueError(
-                    f"git-imerge name '{imerge_name}' is already in "
-                    f"use. Change 'config.git.imerge_name' in config.yaml, "
-                    f"or clean up existing state with reset subcommand"
-                ) from e
-            else:
-                logger.error(
-                    f"Failed to initialize git-imerge merge: {e}"
-                )
-                raise
 
         # Create strategy based on config
         strategy_name = ctx.state.config.strategy.name
@@ -76,8 +75,9 @@ class Initialize(BaseNode[State]):
         ctx.state.runtime.merge.strategy = strategy
 
         # Log successful initialization
+        action = "Resumed" if is_resuming else "Initialized"
         logger.info(
-            f"Initialized git-imerge merge of {source_ref} into "
+            f"{action} git-imerge merge of {source_ref} into "
             f"{target_branch} with {strategy_name} strategy"
         )
 

@@ -65,7 +65,7 @@ class PopenShim:
         uses_stderr = stderr_mode == subprocess.PIPE
 
         # Log command start
-        logger.debug(
+        logger.trace(
             "git-imerge subprocess",
             command=cmd_str,
             cwd=str(cwd) if cwd else None,
@@ -78,7 +78,7 @@ class PopenShim:
         # Note: Uses _REAL_POPEN saved at module import time
         self._process = _REAL_POPEN(args, **kwargs)
 
-        logger.debug(f"Started process PID {self._process.pid}")
+        logger.trace(f"Started process PID {self._process.pid}")
 
     def communicate(self, input=None, timeout=None):
         """Send input and wait for completion.
@@ -93,7 +93,7 @@ class PopenShim:
         stdout, stderr = self._process.communicate(input, timeout)
 
         # Log completion
-        logger.debug(
+        logger.trace(
             "Process communicate() completed",
             returncode=self._process.returncode,
             stdout_bytes=len(stdout) if stdout else 0,
@@ -112,7 +112,7 @@ class PopenShim:
 
         # Log first time we see completion
         if returncode is not None and not hasattr(self, '_poll_logged'):
-            logger.debug(f"Process exited with code {returncode}")
+            logger.trace(f"Process exited with code {returncode}")
             self._poll_logged = True
 
         return returncode
@@ -127,7 +127,7 @@ class PopenShim:
             Return code
         """
         returncode = self._process.wait(timeout)
-        logger.debug(f"Process wait() returned code {returncode}")
+        logger.trace(f"Process wait() returned code {returncode}")
         return returncode
 
     def __enter__(self):
@@ -186,7 +186,7 @@ def check_call_shim(*args, **kwargs):
     cwd = kwargs.get('cwd')
 
     # Log command execution
-    logger.debug(
+    logger.trace(
         "git-imerge check_call",
         command=cmd_str,
         cwd=str(cwd) if cwd else None,
@@ -194,10 +194,10 @@ def check_call_shim(*args, **kwargs):
 
     try:
         result = _REAL_CHECK_CALL(*args, **kwargs)
-        logger.debug("check_call succeeded")
+        logger.trace("check_call succeeded")
         return result
     except subprocess.CalledProcessError as e:
-        logger.debug(f"check_call failed with code {e.returncode}")
+        logger.trace(f"check_call failed with code {e.returncode}")
         raise
 
 
@@ -263,7 +263,7 @@ class StreamCapture(TextIOBase):
             # Log all complete lines
             for line in lines[:-1]:
                 if line:  # Skip empty lines
-                    logger.info(
+                    logger.debug(
                         f"git-imerge {self.stream_name}",
                         message=line,
                     )
@@ -288,7 +288,7 @@ class StreamCapture(TextIOBase):
         if self._buffer:
             incomplete = ''.join(self._buffer)
             if incomplete:
-                logger.info(
+                logger.trace(
                     f"git-imerge {self.stream_name}",
                     message=incomplete,
                     incomplete=True,
@@ -353,7 +353,7 @@ def capture_gitimerge_output(echo_to_terminal: bool = False):
         sys.stdout = StreamCapture(original_stdout, "stdout", echo_to_terminal)
         sys.stderr = StreamCapture(original_stderr, "stderr", echo_to_terminal)
 
-        logger.info(
+        logger.trace(
             "git-imerge output capture enabled",
             subprocess_patched=True,
             stdout_captured=True,
@@ -369,4 +369,4 @@ def capture_gitimerge_output(echo_to_terminal: bool = False):
         sys.stdout = original_stdout
         sys.stderr = original_stderr
 
-        logger.debug("git-imerge output capture disabled")
+        logger.trace("git-imerge output capture disabled")

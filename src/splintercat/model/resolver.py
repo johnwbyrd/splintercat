@@ -1,6 +1,8 @@
 """Conflict resolver using pydantic-AI agent with workspace tools."""
 
-from pydantic_ai import Agent
+from contextlib import contextmanager
+
+from pydantic_ai import Agent, providers
 
 from splintercat.tools import workspace_tools
 from splintercat.tools.workspace import Workspace
@@ -30,27 +32,66 @@ Use the tools to work through the conflict systematically.
 """
 
 
-def create_resolver_agent(model: str = "openai:gpt-4o") -> Agent:
+@contextmanager
+def inject_provider_api_key(api_key: str | None):
+    """Context manager to inject API key into provider creation.
+
+    Temporarily patches pydantic-AI's infer_provider to pass api_key
+    to provider constructors. Restores original behavior on exit.
+
+    Args:
+        api_key: API key to inject, or None to use default behavior
+
+    Yields:
+        None
+    """
+    if not api_key:
+        # No patching needed
+        yield
+        return
+
+    # Save original
+    original_infer_provider = providers.infer_provider
+
+    def patched_infer_provider(provider_name: str):
+        """Infer provider and inject api_key."""
+        provider_class = providers.infer_provider_class(provider_name)
+        return provider_class(api_key=api_key)
+
+    try:
+        providers.infer_provider = patched_infer_provider
+        yield
+    finally:
+        providers.infer_provider = original_infer_provider
+
+
+def create_resolver_agent(
+    model: str = "openai:gpt-4o",
+    api_key: str | None = None
+) -> Agent:
     """Create a resolver agent with workspace tools.
 
     Args:
         model: Model identifier (e.g., 'openai:gpt-4o',
             'anthropic:claude-3-5-sonnet-20241022')
+        api_key: Optional API key (if None, providers use env vars)
 
     Returns:
         Configured Agent ready to resolve conflicts
     """
-    return Agent(
-        model,
-        deps_type=Workspace,
-        tools=workspace_tools,
-        system_prompt=RESOLVER_PROMPT,
-    )
+    with inject_provider_api_key(api_key):
+        return Agent(
+            model,
+            deps_type=Workspace,
+            tools=workspace_tools,
+            system_prompt=RESOLVER_PROMPT,
+        )
 
 
 async def resolve_workspace(
     workspace: Workspace,
     model: str = "openai:gpt-4o",
+    api_key: str | None = None,
     failure_context: str | None = None
 ) -> str:
     """Resolve a conflict using workspace and LLM agent.
@@ -58,6 +99,7 @@ async def resolve_workspace(
     Args:
         workspace: Workspace containing conflict files
         model: Model identifier to use
+        api_key: Optional API key (if None, providers use env vars)
         failure_context: Optional error context from previous
             attempt
 
@@ -67,7 +109,7 @@ async def resolve_workspace(
     Raises:
         ValueError: If resolution is invalid or agent fails
     """
-    agent = create_resolver_agent(model)
+    agent = create_resolver_agent(model, api_key)
 
     # Build prompt with failure context if present
     prompt = "Resolve this merge conflict."
