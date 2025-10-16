@@ -7,7 +7,7 @@ config:
   # ==============================================================================
   git:
     # Git ref to merge from (branch, tag, or commit)
-    source_ref: heaven/main
+    source_ref: heaven-main
 
     # Directory containing the local git repository
     target_workdir: /home/jbyrd/git/llvm-mos
@@ -55,17 +55,8 @@ config:
     # OpenRouter API base URL
     base_url: https://openrouter.ai/api/v1
 
-    # Model for conflict resolution (cheap/fast model recommended)
-    # Resolves merge conflicts mechanically
-    resolver_model: deepseek/deepseek-v3.2-exp
-
-    # Model for build log summarization (cheap/fast model recommended)
-    # Extracts failure information from verbose build logs
-    summarizer_model: deepseek/deepseek-v3.2-exp
-
-    # Model for strategic planning (smart/expensive model recommended)
-    # Makes decisions about merge strategy and recovery
-    planner_model: deepseek/deepseek-v3.2-exp
+    # Model for conflict resolution
+    model: openrouter:x-ai/grok-code-fast-1
 
   # ==============================================================================
   # STRATEGY - Merge strategy and recovery configuration

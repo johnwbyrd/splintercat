@@ -5,6 +5,8 @@ from pathlib import Path
 
 import gitimerge
 
+from splintercat.core.runner import Runner
+
 
 class IMerge:
     """Wrapper for git-imerge operations using the Python API."""
@@ -27,6 +29,7 @@ class IMerge:
         self._original_dir = os.getcwd()
         os.chdir(str(workdir))
         self.git = gitimerge.GitRepository()
+        self.runner = Runner()
 
     def start_merge(self, source_ref: str, target_branch: str):
         """Start an incremental merge.
@@ -94,11 +97,50 @@ class IMerge:
         self.merge_state.request_user_merge(i1, i2)
 
         # Get conflicted files from git status
-        output = gitimerge.check_output(
-            ["git", "diff", "--name-only", "--diff-filter=U"],
-            cwd=str(self.workdir)
+        result = self.runner.execute(
+            "git diff --name-only --diff-filter=U",
+            cwd=self.workdir,
+            check=False,
         )
-        return output.strip().split("\n") if output else []
+        output = result.stdout.strip()
+        return output.split("\n") if output else []
+
+    def read_conflicted_file(self, filepath: str) -> str:
+        """Read a file with conflict markers from working tree.
+
+        Args:
+            filepath: Path to file relative to workdir
+
+        Returns:
+            File content with conflict markers
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+        """
+        file_path = self.workdir / filepath
+        return file_path.read_text()
+
+    def write_resolution(self, filepath: str, content: str):
+        """Write resolved content to file in working tree.
+
+        Args:
+            filepath: Path to file relative to workdir
+            content: Resolved content (no conflict markers)
+        """
+        file_path = self.workdir / filepath
+        file_path.write_text(content)
+
+    def stage_file(self, filepath: str):
+        """Stage a resolved file with git add.
+
+        Args:
+            filepath: Path to file relative to workdir
+        """
+        self.runner.execute(
+            f"git add {filepath}",
+            cwd=self.workdir,
+            check=True,
+        )
 
     def continue_after_resolution(self):
         """Continue merge after user has resolved conflicts."""

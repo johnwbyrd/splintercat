@@ -230,9 +230,9 @@ class MergeState(BaseState):
 class ResetState(BaseState):
     """Reset workflow runtime state (mutates during execution)."""
 
-    force: bool = Field(
+    destroy_target_branch: bool = Field(
         default=False,
-        description="Whether to skip confirmation prompts",
+        description="Whether to destroy and recreate target branch",
     )
     merge_names_found: list[str] = Field(
         default_factory=list,

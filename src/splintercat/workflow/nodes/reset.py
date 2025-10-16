@@ -24,8 +24,14 @@ class Reset(BaseNode[State]):
             End[None]: Workflow completion with no data
         """
         workdir = ctx.state.config.git.target_workdir
-        force = ctx.state.runtime.reset.force
+        destroy_branch = ctx.state.runtime.reset.destroy_target_branch
         runner = Runner()
+
+        # If destroy_target_branch is set, do full branch recreation
+        if destroy_branch:
+            self._destroy_and_recreate_branch(runner, workdir, ctx.state)
+            logger.info("Target branch destroyed and recreated from source")
+            return End(None)
 
         # Get existing merge names
         existing_merges = self._get_existing_merges(runner, workdir, ctx.state)
@@ -34,11 +40,6 @@ class Reset(BaseNode[State]):
             return End(None)
 
         logger.info(f"Found existing merges: {', '.join(existing_merges)}")
-
-        # Confirm unless force is set
-        if not force and not await self._confirm_reset(len(existing_merges)):
-            logger.info("Reset cancelled by user")
-            return End(None)
 
         # Perform reset - deletes all imerge refs in one atomic
         # operation
@@ -173,3 +174,53 @@ class Reset(BaseNode[State]):
         )
 
         logger.info("Successfully deleted all imerge refs")
+
+    def _destroy_and_recreate_branch(
+        self, runner: Runner, workdir, state: State
+    ):
+        """Destroy target branch and recreate from source ref.
+
+        Performs a complete reset of the target branch:
+        1. Abort any in-progress merge operation
+        2. Discard all uncommitted changes (hard reset)
+        3. Remove all untracked files and directories
+        4. Delete the target branch entirely
+        5. Create fresh target branch from source ref
+
+        This is a destructive operation that cannot be undone.
+        """
+        target = state.config.git.target_branch
+        source = state.config.git.source_ref
+        logger.info(
+            f"Destroying {target} and recreating from {source}"
+        )
+
+        # Abort any in-progress merge (e.g., git merge, git imerge)
+        logger.info("Aborting any in-progress merge...")
+        runner.execute(
+            "git merge --abort", cwd=workdir, check=False
+        )
+
+        # Discard all changes in working tree and staging area
+        logger.info("Hard resetting working tree...")
+        runner.execute("git reset --hard", cwd=workdir, check=True)
+
+        # Remove all untracked files and directories
+        logger.info("Cleaning untracked files...")
+        runner.execute("git clean -fd", cwd=workdir, check=True)
+
+        # Delete target branch (fails silently if doesn't exist)
+        logger.info(f"Deleting branch {target}...")
+        runner.execute(
+            f"git branch -D {target}", cwd=workdir, check=False
+        )
+
+        # Create target branch from source ref (or reset if exists)
+        logger.info(f"Creating {target} from {source}...")
+        runner.execute(
+            f"git checkout -B {target} {source}",
+            cwd=workdir,
+            check=True,
+        )
+
+        logger.info(f"Branch {target} recreated successfully")

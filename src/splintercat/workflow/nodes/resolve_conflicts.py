@@ -8,6 +8,11 @@ from pydantic_graph import BaseNode, GraphRunContext
 
 from splintercat.core.config import State
 from splintercat.core.log import logger
+from splintercat.git.integration import (
+    apply_resolution_to_imerge,
+    create_workspace_from_imerge,
+)
+from splintercat.model.resolver import resolve_workspace
 
 
 @dataclass
@@ -25,19 +30,90 @@ class ResolveConflicts(BaseNode[State]):
         Returns:
             Check: Next node to run checks after resolving batch
         """
-        logger.info("ResolveConflicts node - stub implementation")
+        imerge = ctx.state.runtime.merge.current_imerge
+        strategy = ctx.state.runtime.merge.strategy
 
-        # TODO: Implement conflict resolution logic:
-        # 1. Get strategy from ctx.state.runtime.merge.strategy
-        # 2. Get conflicts from imerge.get_current_conflict()
-        # 3. Resolve until strategy.should_check_now() is True
-        # 4. If retry_count > 0, pass error from last_failed_check
-        # 5. Update conflicts_remaining from imerge state
-        # 6. Return Check with appropriate check_names
+        if not imerge:
+            raise ValueError("No active imerge instance")
 
-        # Stub: assume no conflicts remain
-        ctx.state.runtime.merge.conflicts_remaining = False
+        # Get failure context from last check if retrying
+        failure_context = None
+        if ctx.state.runtime.merge.retry_count > 0:
+            last_check = ctx.state.runtime.merge.last_failed_check
+            if last_check:
+                failure_context = (
+                    f"Check '{last_check.check_name}' failed with "
+                    f"returncode {last_check.returncode}. "
+                    f"See log: {last_check.log_file}"
+                )
 
+        # Track conflicts resolved in this batch
+        conflicts_resolved_this_batch = 0
+
+        # Resolve conflicts until strategy says to check
+        while True:
+            # Get current conflict
+            conflict_pair = imerge.get_current_conflict()
+
+            if conflict_pair is None:
+                # No more conflicts
+                logger.info("No more conflicts to resolve")
+                ctx.state.runtime.merge.conflicts_remaining = False
+                break
+
+            i1, i2 = conflict_pair
+            logger.info(f"Resolving conflict pair ({i1}, {i2})")
+
+            # Create workspaces for all conflicted files
+            workspace_id = f"{i1}_{i2}"
+            workspaces = create_workspace_from_imerge(
+                imerge, i1, i2, workspace_id
+            )
+
+            # Resolve each file
+            for filepath, workspace in workspaces.items():
+                logger.info(f"Resolving file: {filepath}")
+
+                # Resolve with LLM
+                resolution = await resolve_workspace(
+                    workspace,
+                    model=ctx.state.config.llm.model,
+                    failure_context=failure_context,
+                )
+
+                # Apply resolution to git
+                apply_resolution_to_imerge(
+                    imerge, filepath, resolution
+                )
+
+                logger.info(f"Resolved {filepath}")
+
+            # Continue imerge after resolving all files in this pair
+            imerge.continue_after_resolution()
+
+            # Increment counter
+            conflicts_resolved_this_batch += 1
+
+            # Check if strategy says to run checks now
+            if strategy.should_check_now(conflicts_resolved_this_batch):
+                logger.info(
+                    f"Strategy says check now after "
+                    f"{conflicts_resolved_this_batch} conflicts"
+                )
+                # Check if more conflicts remain
+                next_conflict = imerge.get_current_conflict()
+                ctx.state.runtime.merge.conflicts_remaining = (
+                    next_conflict is not None
+                )
+                break
+
+        # Reset batch counter for next iteration
+        strategy.reset_batch()
+
+        # Return Check node
         from splintercat.workflow.nodes.check import Check
-        # TODO: Determine which checks to run based on strategy
-        return Check(check_names=["quick"])
+
+        # Determine which checks to run
+        # TODO: Make this configurable
+        check_names = list(ctx.state.config.check.commands.keys())
+        return Check(check_names=check_names)

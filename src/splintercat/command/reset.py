@@ -13,9 +13,15 @@ class ResetCommand(BaseModel):
     cleaning up after a failed merge.
     """
 
-    force: bool = Field(
+    destroy_target_branch: bool = Field(
         default=False,
-        description="Skip confirmation prompt and delete immediately"
+        alias="destroy-target-branch",
+        description=(
+            "Destroy and recreate target branch from source ref. "
+            "Steps: (1) abort any in-progress merge, (2) hard reset "
+            "working tree, (3) clean untracked files, (4) delete "
+            "target branch, (5) checkout -B target from source"
+        )
     )
 
     async def run_workflow(self, state: "State") -> int:
@@ -27,8 +33,10 @@ class ResetCommand(BaseModel):
         Returns:
             Exit code (0=success)
         """
-        # Set force flag on reset state
-        state.runtime.reset.force = self.force
+        # Set flags on reset state
+        state.runtime.reset.destroy_target_branch = (
+            self.destroy_target_branch
+        )
 
         # Create single-node workflow
         from pydantic_graph import Graph

@@ -1,11 +1,11 @@
 """LLM model wrappers."""
 
-from splintercat.model.planner import Planner
-from splintercat.model.resolver import Resolver
-from splintercat.model.summarizer import Summarizer
+from splintercat.model.resolver import (
+    create_resolver_agent,
+    resolve_workspace,
+)
 
 __all__ = [
-    "Resolver",
-    "Summarizer",
-    "Planner",
+    "create_resolver_agent",
+    "resolve_workspace",
 ]
