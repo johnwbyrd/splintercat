@@ -96,7 +96,9 @@ def test_create_workspace_no_markers(mock_imerge):
 
 
 def test_create_workspace_multiple_conflicts(mock_imerge):
-    """Test error when file has multiple conflicts (not supported yet)."""
+    """Test error when file has multiple conflicts (not
+    supported yet).
+    """
     mock_imerge.get_conflict_files.return_value = ["multi.py"]
     mock_imerge.read_conflicted_file.return_value = """
 <<<<<<< HEAD

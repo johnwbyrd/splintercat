@@ -241,6 +241,7 @@ class TestCaptureGitimergeOutput:
     def test_module_isolation_invoke_sees_real_popen(self):
         """Verify invoke sees real subprocess.Popen, not our shim."""
         import subprocess as global_subprocess
+
         import gitimerge
 
         # Save original references
@@ -253,7 +254,6 @@ class TestCaptureGitimergeOutput:
             # But when we import subprocess fresh, it's the real one
             # (This shows invoke, which imports subprocess separately,
             # sees the real Popen)
-            import subprocess as fresh_import
             # Note: fresh_import.Popen might be PopenShim if the global
             # subprocess.Popen was patched, but gitimerge's namespace
             # is what we care about

@@ -1,7 +1,7 @@
 """Output capture shims for git-imerge.
 
-This module provides transparent wrappers that capture and log all output
-from git-imerge operations through three mechanisms:
+This module provides transparent wrappers that capture and log all
+output from git-imerge operations through three mechanisms:
 
 1. subprocess.Popen wrapper - Logs all git command executions
 2. subprocess.check_call wrapper - Logs check_call operations
@@ -11,14 +11,15 @@ All output is routed through logfire for complete observability while
 maintaining normal terminal output (configurable).
 """
 
+# Import subprocess and IMMEDIATELY save the real Popen before
+# any patching
+import subprocess
 import sys
 from contextlib import contextmanager
 from io import TextIOBase
 
 from splintercat.core.log import logger
 
-# Import subprocess and IMMEDIATELY save the real Popen before any patching
-import subprocess
 _REAL_POPEN = subprocess.Popen
 _REAL_CHECK_CALL = subprocess.check_call
 
@@ -347,7 +348,8 @@ def capture_gitimerge_output(echo_to_terminal: bool = False):
         gitimerge.check_call = check_call_shim
 
         # Patch stdout/stderr globally
-        # Note: This affects all code, but scope is narrow (just this context)
+        # Note: This affects all code, but scope is narrow
+        # (just this context)
         sys.stdout = StreamCapture(original_stdout, "stdout", echo_to_terminal)
         sys.stderr = StreamCapture(original_stderr, "stderr", echo_to_terminal)
 

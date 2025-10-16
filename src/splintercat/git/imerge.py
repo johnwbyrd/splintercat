@@ -43,7 +43,8 @@ class IMerge:
             # Require clean work tree
             self.git.require_clean_work_tree('proceed')
 
-            # Get merge boundaries (returns merge_base, commits1, commits2)
+            # Get merge boundaries
+            # (returns merge_base, commits1, commits2)
             merge_base, commits1, commits2 = self.git.get_boundaries(
                 target_branch, source_ref, first_parent=False
             )
@@ -77,7 +78,8 @@ class IMerge:
                 # Auto-complete what we can
                 self.merge_state.auto_complete_frontier()
             except gitimerge.FrontierBlockedError as e:
-                # Found a conflict - extract (i1, i2) from blocked frontier
+                # Found a conflict - extract (i1, i2) from
+                # blocked frontier
                 # The exception should indicate which merge is blocked
                 return (e.i1, e.i2)
             except gitimerge.NothingToDoError:
