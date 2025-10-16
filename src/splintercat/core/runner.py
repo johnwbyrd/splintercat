@@ -26,6 +26,7 @@ class Runner(Context):
         log_file: Path | None = None,
         log_level: str | None = None,
         check: bool = True,
+        env: dict[str, str] | None = None,
     ) -> Result:
         """Execute a command with full control over execution
         parameters.
@@ -40,6 +41,8 @@ class Runner(Context):
                 (INFO, DEBUG, etc.)
             check: If True, raise exception on non-zero exit
                 code
+            env: Environment variables to set (updates os.environ,
+                does not replace it)
 
         Returns:
             invoke.Result with stdout, stderr, exited (return
@@ -61,6 +64,9 @@ class Runner(Context):
 
         if stdin:
             kwargs["in_stream"] = stdin
+
+        if env:
+            kwargs["env"] = env
 
         # Execute with or without cwd, catching timeout exceptions
         try:

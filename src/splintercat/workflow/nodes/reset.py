@@ -128,24 +128,6 @@ class Reset(BaseNode[State]):
             logger.error(f"Failed to get refs for {merge_name}: {e}")
             return []
 
-    async def _confirm_reset(self, num_merges: int) -> bool:
-        """Get user confirmation for reset operation."""
-        # TODO: Implement interactive confirmation
-        # For now, show warning and assume cancelled for safety
-        logger.warning(
-            "Interactive confirmation not implemented - reset "
-            "cancelled for safety"
-        )
-        logger.warning(
-            f"Would delete all refs from {num_merges} imerge "
-            f"merge(s)"
-        )
-        logger.warning(
-            "Use 'reset --force' subcommand to force "
-            "reset without confirmation"
-        )
-        return False
-
     def _reset_all_merges(self, runner: Runner, workdir, state: State):
         """Reset all imerge state by deleting all refs.
 

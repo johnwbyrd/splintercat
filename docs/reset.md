@@ -63,7 +63,7 @@ A **Reset** node that encapsulates this knowledge with appropriate safety:
 ### Design Principles
 
 **User-initiated only**: Never automatic - requires explicit user action
-- CLI command: `splintercat reset --force`
+- CLI command: `splintercat reset`
 - Interactive prompt option in error recovery
 - No workflow edges automatically route to Reset
 
@@ -72,7 +72,6 @@ A **Reset** node that encapsulates this knowledge with appropriate safety:
 - Check for unresolved conflicts
 - Ensure not on scratch branches
 - Show exactly what will be deleted
-- Require explicit confirmation (unless --force)
 
 **Comprehensive cleanup**: Removes all imerge state
 - Delete all refs under `refs/imerge/{merge_name}/`
@@ -109,4 +108,3 @@ After implementing Reset:
 - Test that multiple reset operations are safe
 - Ensure it handles missing/partial state gracefully
 - Validate all safety checks work correctly
-- Test both interactive and --force modes

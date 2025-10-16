@@ -6,6 +6,7 @@ from pathlib import Path
 import gitimerge
 
 from splintercat.core.runner import Runner
+from splintercat.git.shim import capture_gitimerge_output
 
 
 class IMerge:
@@ -38,27 +39,28 @@ class IMerge:
             source_ref: Source git ref to merge from
             target_branch: Target branch to merge into
         """
-        # Require clean work tree
-        self.git.require_clean_work_tree('proceed')
+        with capture_gitimerge_output():
+            # Require clean work tree
+            self.git.require_clean_work_tree('proceed')
 
-        # Get merge boundaries (returns merge_base, commits1, commits2)
-        merge_base, commits1, commits2 = self.git.get_boundaries(
-            target_branch, source_ref, first_parent=False
-        )
+            # Get merge boundaries (returns merge_base, commits1, commits2)
+            merge_base, commits1, commits2 = self.git.get_boundaries(
+                target_branch, source_ref, first_parent=False
+            )
 
-        # Initialize merge state
-        self.merge_state = gitimerge.MergeState.initialize(
-            self.git,
-            self.name,
-            merge_base,
-            target_branch,
-            commits1,
-            source_ref,
-            commits2,
-            goal=self.goal,
-            branch=target_branch,
-        )
-        self.merge_state.save()
+            # Initialize merge state
+            self.merge_state = gitimerge.MergeState.initialize(
+                self.git,
+                self.name,
+                merge_base,
+                target_branch,
+                commits1,
+                source_ref,
+                commits2,
+                goal=self.goal,
+                branch=target_branch,
+            )
+            self.merge_state.save()
 
     def get_current_conflict(self) -> tuple[int, int] | None:
         """Get current conflict pair needing resolution.
@@ -70,16 +72,17 @@ class IMerge:
         if not self.merge_state:
             return None
 
-        try:
-            # Auto-complete what we can
-            self.merge_state.auto_complete_frontier()
-        except gitimerge.FrontierBlockedError as e:
-            # Found a conflict - extract (i1, i2) from blocked frontier
-            # The exception should indicate which merge is blocked
-            return (e.i1, e.i2)
-        except gitimerge.NothingToDoError:
-            # Merge is complete
-            return None
+        with capture_gitimerge_output():
+            try:
+                # Auto-complete what we can
+                self.merge_state.auto_complete_frontier()
+            except gitimerge.FrontierBlockedError as e:
+                # Found a conflict - extract (i1, i2) from blocked frontier
+                # The exception should indicate which merge is blocked
+                return (e.i1, e.i2)
+            except gitimerge.NothingToDoError:
+                # Merge is complete
+                return None
 
         return None
 
@@ -93,8 +96,9 @@ class IMerge:
         Returns:
             List of file paths with conflicts
         """
-        # Request user merge for this conflict pair
-        self.merge_state.request_user_merge(i1, i2)
+        with capture_gitimerge_output():
+            # Request user merge for this conflict pair
+            self.merge_state.request_user_merge(i1, i2)
 
         # Get conflicted files from git status
         result = self.runner.execute(
@@ -147,9 +151,10 @@ class IMerge:
         if not self.merge_state:
             return
 
-        # Incorporate the user's manual merge
-        self.merge_state.incorporate_user_merge()
-        self.merge_state.save()
+        with capture_gitimerge_output():
+            # Incorporate the user's manual merge
+            self.merge_state.incorporate_user_merge()
+            self.merge_state.save()
 
     def is_complete(self) -> bool:
         """Check if merge is complete.
@@ -161,14 +166,15 @@ class IMerge:
         if not self.merge_state:
             return False
 
-        try:
-            self.merge_state.auto_complete_frontier()
-            return True
-        except (
-            gitimerge.FrontierBlockedError,
-            gitimerge.NothingToDoError
-        ):
-            return False
+        with capture_gitimerge_output():
+            try:
+                self.merge_state.auto_complete_frontier()
+                return True
+            except (
+                gitimerge.FrontierBlockedError,
+                gitimerge.NothingToDoError
+            ):
+                return False
 
     def finalize(self) -> str:
         """Simplify merge to single two-parent merge commit.
@@ -179,13 +185,14 @@ class IMerge:
         if not self.merge_state:
             raise ValueError("No merge state to finalize")
 
-        # Simplify to single merge commit
-        refname = f"refs/heads/{self.merge_state.branch or 'HEAD'}"
-        self.merge_state.simplify(refname)
+        with capture_gitimerge_output():
+            # Simplify to single merge commit
+            refname = f"refs/heads/{self.merge_state.branch or 'HEAD'}"
+            self.merge_state.simplify(refname)
 
-        # Get the final commit SHA
-        final_commit = self.git.get_commit_sha1(refname)
-        return final_commit
+            # Get the final commit SHA
+            final_commit = self.git.get_commit_sha1(refname)
+            return final_commit
 
     def __del__(self):
         """Cleanup: restore original directory."""

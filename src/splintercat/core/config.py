@@ -320,6 +320,8 @@ class State(BaseSettings):
         cli_implicit_flags=True,
         cli_use_class_docs_for_groups=True,
         arbitrary_types_allowed=True,
+        # Disregard .env variables that don't match config
+        extra='ignore'
     )
 
     @classmethod
