@@ -77,8 +77,8 @@ class ResolveConflicts(BaseNode[State]):
                 failure_context=failure_context,
             )
 
-            # Files are written by write_file() tool
-            # Just need to stage them
+            # Stage all resolved files
+            # (stage_file handles case where files are already staged)
             for filepath in workspace.conflict_files:
                 logger.info(f"Staging resolved file: {filepath}")
                 imerge.stage_file(filepath)

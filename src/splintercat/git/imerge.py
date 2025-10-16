@@ -6,6 +6,7 @@ from pathlib import Path
 
 import gitimerge
 
+from splintercat.core.log import logger
 from splintercat.core.runner import Runner
 from splintercat.git.shim import capture_gitimerge_output
 
@@ -206,8 +207,15 @@ class IMerge:
     def stage_file(self, filepath: str):
         """Stage a resolved file with git add.
 
+        Handles expected failures gracefully:
+        - File already staged (e.g., by git rm) -> Success
+        - Other failures -> Raise with clear error message
+
         Args:
             filepath: Path to file relative to workdir
+
+        Raises:
+            RuntimeError: If staging fails for unexpected reason
         """
         if self.config:
             cmd = self.config.commands["git"]["add_file"].format(
@@ -215,10 +223,31 @@ class IMerge:
             )
         else:
             cmd = f"git add {filepath}"
-        self.runner.execute(
+
+        result = self.runner.execute(
             cmd,
             cwd=self.workdir,
-            check=True,
+            check=False,  # Don't raise, we'll inspect the result
+        )
+
+        if result.exited == 0:
+            logger.debug(f"Staged {filepath}")
+            return
+
+        # Check if this is expected (file already staged by git rm)
+        if "did not match any files" in result.stderr:
+            logger.info(
+                f"File {filepath} already staged "
+                f"(likely deleted with git rm)"
+            )
+            return
+
+        # Unexpected error - provide clear message with full context
+        raise RuntimeError(
+            f"Failed to stage {filepath}: exit code {result.exited}\n"
+            f"Command: {cmd}\n"
+            f"stderr: {result.stderr}\n"
+            f"stdout: {result.stdout}"
         )
 
     def continue_after_resolution(self):

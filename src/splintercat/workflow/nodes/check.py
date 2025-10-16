@@ -45,7 +45,7 @@ class Check(BaseNode[State]):
             )
 
             if not result.success:
-                # Check failed - retry current batch with error context
+                # Check failed
                 ctx.state.runtime.merge.last_failed_check = result
                 ctx.state.runtime.merge.retry_count += 1
 
@@ -58,6 +58,20 @@ class Check(BaseNode[State]):
                     raise RuntimeError(
                         f"Check '{name}' failed after {max_retries} "
                         f"retry attempts"
+                    )
+
+                # If no conflicts remain, can't retry by re-resolving
+                if not ctx.state.runtime.merge.conflicts_remaining:
+                    logger.error(
+                        f"Check '{name}' failed but all conflicts are "
+                        f"resolved. Cannot retry - merge is complete but "
+                        f"broken. See log: {result.log_file}"
+                    )
+                    raise RuntimeError(
+                        f"Check '{name}' failed on completed merge. "
+                        f"All conflicts were resolved but the final merge "
+                        f"does not pass checks. Manual intervention required. "
+                        f"Log: {result.log_file}"
                     )
 
                 logger.warning(
