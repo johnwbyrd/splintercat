@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic_ai import RunContext
+from pydantic_ai.exceptions import ModelRetry
 
 from splintercat.tools.parser import Conflict
 
@@ -227,10 +228,12 @@ class Tools:
             Resolution content if valid, or error message
 
         Raises:
-            ValueError: If resolution is invalid
+            ModelRetry: If resolution is invalid, with instructions for fixing
         """
         if filename not in self.workspace.files:
-            raise ValueError(f"File '{filename}' not found")
+            raise ModelRetry(
+                f"File '{filename}' not found. Use list_files() to see available files."
+            )
 
         resolution = self.workspace.files[filename].content
         before = self.workspace.files["before"].content
@@ -238,13 +241,17 @@ class Tools:
 
         # Validate structure - must include required context
         if not resolution.startswith(before):
-            raise ValueError(
-                "Resolution must start with 'before' content"
+            raise ModelRetry(
+                "Resolution must start with 'before' content. "
+                f"Current resolution starts with: {resolution[:100]!r}... "
+                f"but should start with: {before[:100]!r}..."
             )
 
         if not resolution.endswith(after):
-            raise ValueError(
-                "Resolution must end with 'after' content"
+            raise ModelRetry(
+                "Resolution must end with 'after' content. "
+                f"Current resolution ends with: ...{resolution[-100:]!r} "
+                f"but should end with: ...{after[-100:]!r}"
             )
 
         # Return the resolved content
@@ -397,12 +404,14 @@ def submit_resolution(
         Resolution content if valid
 
     Raises:
-        ValueError: If resolution is invalid
+        ModelRetry: If resolution is invalid, with instructions for fixing
     """
     workspace = ctx.deps
 
     if filename not in workspace.files:
-        raise ValueError(f"File '{filename}' not found")
+        raise ModelRetry(
+            f"File '{filename}' not found. Use list_files() to see available files."
+        )
 
     resolution = workspace.files[filename].content
     before = workspace.files["before"].content
@@ -410,13 +419,17 @@ def submit_resolution(
 
     # Validate structure - must include required context
     if not resolution.startswith(before):
-        raise ValueError(
-            "Resolution must start with 'before' content"
+        raise ModelRetry(
+            "Resolution must start with 'before' content. "
+            f"Current resolution starts with: {resolution[:100]!r}... "
+            f"but should start with: {before[:100]!r}..."
         )
 
     if not resolution.endswith(after):
-        raise ValueError(
-            "Resolution must end with 'after' content"
+        raise ModelRetry(
+            "Resolution must end with 'after' content. "
+            f"Current resolution ends with: ...{resolution[-100:]!r} "
+            f"but should end with: ...{after[-100:]!r}"
         )
 
     # Return the resolved content

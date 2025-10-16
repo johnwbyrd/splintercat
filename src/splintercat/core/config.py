@@ -97,6 +97,14 @@ class LLMConfig(BaseConfig):
             "(e.g., openai/gpt-4o, anthropic/claude-sonnet-4)"
         )
     )
+    api_key: str | None = Field(
+        default=None,
+        description=(
+            "API key for LLM provider. If not set, provider will "
+            "look for provider-specific environment variables "
+            "(e.g., OPENAI_API_KEY, OPENROUTER_API_KEY)"
+        )
+    )
 
 
 class StrategyConfig(BaseConfig):
