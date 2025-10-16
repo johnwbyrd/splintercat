@@ -11,12 +11,17 @@ logger = type(
 )()
 
 
-def setup(verbose: bool = False):
-    """Configure logging for splintercat."""
-    # Configure logfire with appropriate verbosity
-    # verbose=True shows DEBUG level, False shows INFO level
+def setup(min_log_level: str = 'info'):
+    """Configure logging for splintercat.
+
+    Args:
+        min_log_level: Minimum log level to display
+            ('trace', 'debug', 'info', 'warn', 'error', 'fatal')
+    """
+    from logfire import ConsoleOptions
+
     logfire.configure(
-        console={'verbose': verbose}
+        console=ConsoleOptions(min_log_level=min_log_level)
     )
     # Instrument pydantic-AI to trace all agent runs, model
     # requests, and tool calls

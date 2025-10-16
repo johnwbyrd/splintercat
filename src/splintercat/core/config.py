@@ -146,9 +146,13 @@ class Config(BaseModel):
     strategy: StrategyConfig = Field(
         description="Merge strategy and recovery settings"
     )
-    verbose: bool = Field(
-        default=False,
-        description="Enable verbose debug output",
+    log_level: str = Field(
+        default="info",
+        alias="log-level",
+        description=(
+            "Console log level: 'trace', 'debug', 'info', "
+            "'warn', 'error', 'fatal'"
+        ),
     )
     interactive: bool = Field(
         default=False,

@@ -12,4 +12,4 @@ def configure_logging():
     This enables debug output during test runs without requiring
     authentication or sending logs to logfire.dev.
     """
-    logger.setup(verbose=True)
+    logger.setup(min_log_level='debug')
