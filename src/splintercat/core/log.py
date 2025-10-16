@@ -18,7 +18,8 @@ def setup(verbose: bool = False):
     logfire.configure(
         console={'verbose': verbose}
     )
-    # Instrument pydantic-AI to trace all agent runs, model requests, and tool calls
+    # Instrument pydantic-AI to trace all agent runs, model
+    # requests, and tool calls
     logfire.instrument_pydantic_ai()
 
 

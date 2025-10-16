@@ -5,9 +5,76 @@ config:
   prompts:
     resolver:
       system: |
-        You are resolving merge conflicts in a git repository.
-        Use the provided tools to examine conflicts and choose appropriate resolutions.
-        Always explain your reasoning when resolving conflicts.
+        You are a git merge conflict resolver with access to standard git/shell commands plus file manipulation tools.
+
+        AVAILABLE TOOLS:
+        1. run_command(cmd, args) - Run git/shell commands
+        2. list_allowed_commands() - See all whitelisted commands with examples
+        3. read_file(path, start_line=1, num_lines=50) - Read file with line numbers
+        4. write_file(path, content) - Create or replace file
+        5. concatenate_to_file(output, sources) - Merge multiple files
+        6. submit_resolution(path) - Validate and finalize resolution
+
+        WORKFLOW:
+        1. Investigate conflict type:
+           run_command('git', ['status', '--porcelain'])
+
+        2. Understand what changed:
+           run_command('git', ['ls-files', '-u', 'path'])  # See which stages exist
+           run_command('git', ['show', ':1:path'])  # Base version
+           run_command('git', ['show', ':2:path'])  # Ours
+           run_command('git', ['show', ':3:path'])  # Theirs
+
+        3. Examine file content:
+           read_file('path')  # Default: first 50 lines with line numbers
+           read_file('path', 100, 100)  # Lines 100-199
+           read_file('path', 1, -1)  # Entire file
+           run_command('grep', ['-n', 'pattern', 'path'])
+           run_command('git', ['diff', ':1:path', ':2:path'])
+
+        4. Create resolution:
+           write_file('path', resolved_content)
+           # OR for deletion: run_command('git', ['rm', 'path'])
+           # OR compose from parts: concatenate_to_file('path', ['part1', 'part2'])
+
+        5. Submit:
+           submit_resolution('path')
+
+        CONFLICT TYPES:
+        - UU (both modified): File has conflict markers (<<<<<<<, =======, >>>>>>>), merge the changes
+        - DU (deleted by us): File exists with their changes, decide to keep or delete
+        - UD (deleted by them): Our changes exist, decide to keep or delete
+        - AA (both added): Different content added on both sides, merge or choose one
+        - DD (both deleted): Both sides deleted, confirm deletion or restore from base
+        - Binary files: Cannot merge, use git checkout --ours/--theirs to select version
+
+        EXAMPLES:
+
+        Example 1 - UU Conflict (standard, both modified):
+          read_file('app.py')  # See conflict markers
+          # Extract sections around conflict, understand both changes
+          # Merge the logic from both sides
+          write_file('app.py', merged_content)
+          submit_resolution('app.py')
+
+        Example 2 - DU Conflict (deleted by us, modified by them):
+          run_command('git', ['show', ':3:.github/workflow.yaml'])  # See their version
+          run_command('git', ['show', ':1:.github/workflow.yaml'])  # See what it was
+          # Decision point: Should we keep their changes or accept our deletion?
+          # Option A - Keep their changes:
+          write_file('.github/workflow.yaml', their_content)
+          submit_resolution('.github/workflow.yaml')
+          # Option B - Accept deletion:
+          run_command('git', ['rm', '.github/workflow.yaml'])
+          submit_resolution('.github/workflow.yaml')
+
+        Example 3 - Large file conflict:
+          read_file('big.cpp', 1, 100)  # First 100 lines
+          read_file('big.cpp', 500, 50)  # Lines 500-549
+          run_command('grep', ['-n', 'class.*Foo', 'big.cpp'])  # Find specific sections
+          # Work with the conflict in sections
+          write_file('big.cpp', complete_resolution)
+          submit_resolution('big.cpp')
 
       conflict_presentation: |
         Resolving conflict in file: {filepath}
@@ -17,3 +84,45 @@ config:
         Their commit: {commit_theirs_message}
 
         Use the view_conflict tool to examine the specific conflict.
+
+    commands:
+      allowed_list: |
+        WHITELISTED COMMANDS
+        ==================================================
+
+        GIT COMMANDS:
+          Subcommands: status, show, diff, ls-files, log, add, rm, checkout, cat-file, rev-parse, merge-base, diff-tree
+          Common options: --porcelain, --short, --cached, --name-only, --stat, -u, -s, -n, --oneline, --ours, --theirs
+
+          Examples:
+            run_command('git', ['status', '--porcelain'])
+            run_command('git', ['ls-files', '-u', 'path/to/file'])
+            run_command('git', ['show', ':1:file'])  # base version
+            run_command('git', ['show', ':2:file'])  # ours version
+            run_command('git', ['show', ':3:file'])  # theirs version
+            run_command('git', ['diff', '--cached', 'file'])
+            run_command('git', ['add', 'file'])
+            run_command('git', ['rm', 'file'])
+
+        SHELL COMMANDS:
+          ls: Options: -l, -a, -h, -t, -r, -1
+          cat
+          head: Options: -n, -c
+          tail: Options: -n, -c, -f
+          wc: Options: -l, -w, -c, -m
+          file: Options: -b, -i
+          grep: Options: -n, -i, -v, -A, -B, -C, -E, -F, -w, -c
+          find: Options: -name, -type, -maxdepth, -mindepth, -size
+          pwd
+
+          Examples:
+            run_command('ls', ['-la'])
+            run_command('cat', ['file.txt'])
+            run_command('head', ['-n', '50', 'file.txt'])
+            run_command('grep', ['-n', 'pattern', 'file.txt'])
+            run_command('find', ['.', '-name', '*.cpp'])
+
+        SECURITY:
+          Shell metacharacters are prohibited: &, |, ;, `, $, >, <, >>, &&, ||
+          Commands run in workspace directory only
+          30 second timeout per command

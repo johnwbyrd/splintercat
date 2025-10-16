@@ -9,7 +9,6 @@ from pydantic_graph import BaseNode, GraphRunContext
 from splintercat.core.config import State
 from splintercat.core.log import logger
 from splintercat.git.integration import (
-    apply_resolution_to_imerge,
     create_workspace_from_imerge,
 )
 from splintercat.model.resolver import resolve_workspace
@@ -64,30 +63,25 @@ class ResolveConflicts(BaseNode[State]):
             i1, i2 = conflict_pair
             logger.info(f"Resolving conflict pair ({i1}, {i2})")
 
-            # Create workspaces for all conflicted files
-            workspace_id = f"{i1}_{i2}"
-            workspaces = create_workspace_from_imerge(
-                imerge, i1, i2, workspace_id
+            # Create workspace for this conflict pair
+            workspace = create_workspace_from_imerge(
+                imerge, i1, i2, config=ctx.state.config
             )
 
-            # Resolve each file
-            for filepath, workspace in workspaces.items():
-                logger.info(f"Resolving file: {filepath}")
+            # Resolve all conflicts
+            # LLM has access to all files via commands
+            await resolve_workspace(
+                workspace,
+                model=ctx.state.config.llm.model,
+                api_key=ctx.state.config.llm.api_key,
+                failure_context=failure_context,
+            )
 
-                # Resolve with LLM
-                resolution = await resolve_workspace(
-                    workspace,
-                    model=ctx.state.config.llm.model,
-                    api_key=ctx.state.config.llm.api_key,
-                    failure_context=failure_context,
-                )
-
-                # Apply resolution to git
-                apply_resolution_to_imerge(
-                    imerge, filepath, resolution
-                )
-
-                logger.info(f"Resolved {filepath}")
+            # Files are written by write_file() tool
+            # Just need to stage them
+            for filepath in workspace.conflict_files:
+                logger.info(f"Staging resolved file: {filepath}")
+                imerge.stage_file(filepath)
 
             # Continue imerge after resolving all files in this pair
             imerge.continue_after_resolution()

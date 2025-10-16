@@ -23,35 +23,17 @@ def test_create_workspace_simple_conflict(mock_imerge):
     """Test creating workspace from simple conflict."""
     # Mock the imerge methods
     mock_imerge.get_conflict_files.return_value = ["test.py"]
-    mock_imerge.read_conflicted_file.return_value = """line 1
-line 2
-<<<<<<< HEAD
-our change
-=======
-their change
->>>>>>> branch
-line 3
-line 4
-"""
 
-    # Create workspaces
-    workspaces = create_workspace_from_imerge(
+    # Create workspace with new simplified API
+    workspace = create_workspace_from_imerge(
         mock_imerge,
         i1=1,
-        i2=2,
-        workspace_id="test123"
+        i2=2
     )
 
-    # Should have one workspace for test.py
-    assert len(workspaces) == 1
-    assert "test.py" in workspaces
-
-    # Check workspace contents
-    workspace = workspaces["test.py"]
-    assert workspace.files["ours"].content == "our change"
-    assert workspace.files["theirs"].content == "their change"
-    assert len(workspace.files["before"].content.splitlines()) == 2
-    assert len(workspace.files["after"].content.splitlines()) == 2
+    # Check workspace has correct attributes
+    assert workspace.workdir == mock_imerge.workdir
+    assert workspace.conflict_files == ["test.py"]
 
 
 def test_create_workspace_no_conflicts(mock_imerge):
@@ -62,65 +44,29 @@ def test_create_workspace_no_conflicts(mock_imerge):
         create_workspace_from_imerge(
             mock_imerge,
             i1=1,
-            i2=2,
-            workspace_id="test123"
+            i2=2
         )
 
 
-def test_create_workspace_file_not_found(mock_imerge):
-    """Test error when conflicted file doesn't exist."""
-    mock_imerge.get_conflict_files.return_value = ["missing.py"]
-    mock_imerge.read_conflicted_file.side_effect = FileNotFoundError()
+def test_create_workspace_with_multiple_files(mock_imerge):
+    """Test workspace with multiple conflicted files."""
+    mock_imerge.get_conflict_files.return_value = [
+        "file1.py",
+        "file2.py",
+        "file3.py"
+    ]
 
-    with pytest.raises(ValueError, match="not found"):
-        create_workspace_from_imerge(
-            mock_imerge,
-            i1=1,
-            i2=2,
-            workspace_id="test123"
-        )
+    workspace = create_workspace_from_imerge(
+        mock_imerge,
+        i1=1,
+        i2=2
+    )
 
-
-def test_create_workspace_no_markers(mock_imerge):
-    """Test error when file has no conflict markers."""
-    mock_imerge.get_conflict_files.return_value = ["clean.py"]
-    mock_imerge.read_conflicted_file.return_value = "no conflicts here"
-
-    with pytest.raises(ValueError, match="No conflict markers"):
-        create_workspace_from_imerge(
-            mock_imerge,
-            i1=1,
-            i2=2,
-            workspace_id="test123"
-        )
-
-
-def test_create_workspace_multiple_conflicts(mock_imerge):
-    """Test error when file has multiple conflicts (not
-    supported yet).
-    """
-    mock_imerge.get_conflict_files.return_value = ["multi.py"]
-    mock_imerge.read_conflicted_file.return_value = """
-<<<<<<< HEAD
-conflict 1 ours
-=======
-conflict 1 theirs
->>>>>>> branch
-middle
-<<<<<<< HEAD
-conflict 2 ours
-=======
-conflict 2 theirs
->>>>>>> branch
-"""
-
-    with pytest.raises(ValueError, match="Multiple conflicts"):
-        create_workspace_from_imerge(
-            mock_imerge,
-            i1=1,
-            i2=2,
-            workspace_id="test123"
-        )
+    # Should have all three files in conflict_files list
+    assert len(workspace.conflict_files) == 3
+    assert "file1.py" in workspace.conflict_files
+    assert "file2.py" in workspace.conflict_files
+    assert "file3.py" in workspace.conflict_files
 
 
 def test_apply_resolution(mock_imerge):
@@ -138,36 +84,19 @@ def test_apply_resolution(mock_imerge):
     mock_imerge.stage_file.assert_called_once_with(filepath)
 
 
-def test_create_workspace_with_context(mock_imerge):
-    """Test creating workspace with custom context lines."""
+def test_create_workspace_with_config(mock_imerge):
+    """Test creating workspace with config object."""
     mock_imerge.get_conflict_files.return_value = ["test.py"]
-    mock_imerge.read_conflicted_file.return_value = """line 1
-line 2
-line 3
-<<<<<<< HEAD
-ours
-=======
-theirs
->>>>>>> branch
-line 4
-line 5
-line 6
-"""
 
-    # Request only 1 line of context
-    workspaces = create_workspace_from_imerge(
+    # Create mock config
+    mock_config = Mock()
+
+    workspace = create_workspace_from_imerge(
         mock_imerge,
         i1=1,
         i2=2,
-        workspace_id="test123",
-        context_lines=1
+        config=mock_config
     )
 
-    workspace = workspaces["test.py"]
-
-    # Should have only 1 line before and after
-    assert len(workspace.files["before"].content.splitlines()) == 1
-    assert "line 3" in workspace.files["before"].content
-
-    assert len(workspace.files["after"].content.splitlines()) == 1
-    assert "line 4" in workspace.files["after"].content
+    # Should pass config to workspace
+    assert workspace.config == mock_config

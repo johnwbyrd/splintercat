@@ -8,32 +8,6 @@ from splintercat.core.log import logger
 from splintercat.tools import workspace_tools
 from splintercat.tools.workspace import Workspace
 
-# System prompt for the resolver agent
-RESOLVER_PROMPT = """You are an expert conflict resolution assistant.
-
-Your task is to resolve git merge conflicts using the workspace tools.
-
-WORKFLOW:
-1. Call list_files() to see available files
-2. Read 'before' and 'after' to understand the context
-3. Read 'ours' and 'theirs' to see both changes
-4. Read 'base' (if available) to understand the original
-5. Decide how to integrate both changes
-6. Use cat_files() to compose resolution from before + content + after
-7. Call submit_resolution() with your composed file
-8. Return the resolution content from submit_resolution() as your final text response
-
-REQUIREMENTS:
-- Resolution MUST start with 'before' content
-- Resolution MUST end with 'after' content
-- Resolution MUST integrate both changes when possible
-- Prefer keeping both changes over discarding one
-- If changes conflict, choose the most logical merge
-
-Use the tools to work through the conflict systematically.
-After submit_resolution() succeeds, you MUST return its output as your final response.
-"""
-
 
 @contextmanager
 def inject_provider_api_key(api_key: str | None):
@@ -70,7 +44,8 @@ def inject_provider_api_key(api_key: str | None):
 
 def create_resolver_agent(
     model: str = "openai:gpt-4o",
-    api_key: str | None = None
+    api_key: str | None = None,
+    system_prompt: str | None = None
 ) -> Agent:
     """Create a resolver agent with workspace tools.
 
@@ -78,16 +53,21 @@ def create_resolver_agent(
         model: Model identifier (e.g., 'openai:gpt-4o',
             'anthropic:claude-3-5-sonnet-20241022')
         api_key: Optional API key (if None, providers use env vars)
+        system_prompt: System prompt to use (if None, uses default)
 
     Returns:
         Configured Agent ready to resolve conflicts
     """
+    # Default prompt if none provided
+    if not system_prompt:
+        system_prompt = "You are a git merge conflict resolver."
+
     with inject_provider_api_key(api_key):
         return Agent(
             model,
             deps_type=Workspace,
             tools=workspace_tools,
-            system_prompt=RESOLVER_PROMPT,
+            system_prompt=system_prompt,
         )
 
 
@@ -112,37 +92,42 @@ async def resolve_workspace(
     Raises:
         ValueError: If resolution is invalid or agent fails
     """
+    # Get system prompt from config
+    system_prompt = None
+    if workspace.config and hasattr(workspace.config, 'prompts'):
+        prompts = workspace.config.prompts
+        if 'resolver' in prompts and 'system' in prompts['resolver']:
+            system_prompt = prompts['resolver']['system']
+
     logger.debug(f"Creating resolver agent with model: {model}")
     logger.debug(f"API key provided: {api_key is not None}")
     if api_key:
         logger.debug(f"API key prefix: {api_key[:10]}...")
-    agent = create_resolver_agent(model, api_key)
+
+    agent = create_resolver_agent(model, api_key, system_prompt)
     logger.debug(f"Agent created: {agent}")
     logger.debug(f"Agent model: {agent.model}")
     logger.debug(f"Agent model name: {agent.model.model_name}")
 
     # Build prompt with failure context if present
-    prompt = "Resolve this merge conflict."
+    files_str = ', '.join(workspace.conflict_files)
+    prompt = f"Resolve conflicts in these files: {files_str}"
     if failure_context:
         prompt += (
             f"\n\nPREVIOUS ATTEMPT FAILED:\n{failure_context}\n\n"
             f"Please try again, taking the error into account."
         )
 
-    # Log workspace contents for debugging
-    logger.debug(f"Workspace files: {list(workspace.files.keys())}")
+    # Log workspace info for debugging
+    logger.debug(f"Workspace workdir: {workspace.workdir}")
+    logger.debug(f"Conflict files: {workspace.conflict_files}")
     logger.debug(f"Prompt: {prompt}")
     logger.debug(f"Prompt length: {len(prompt)} chars")
 
-    # Dump workspace file sizes
-    for name, file_obj in workspace.files.items():
-        logger.debug(
-            f"  {name}: {len(file_obj.content)} chars"
-        )
-
     # Run agent with workspace as dependencies
     logger.debug("Calling LLM API...")
-    logger.debug(f"Agent system prompt length: {len(RESOLVER_PROMPT)}")
+    if system_prompt:
+        logger.debug(f"Agent system prompt length: {len(system_prompt)}")
     logger.debug(f"Workspace object: {workspace}")
 
     try:
@@ -155,7 +140,10 @@ async def resolve_workspace(
 
         # For JSONDecodeError, show the problematic document
         if hasattr(e, 'doc'):
-            logger.error(f"JSONDecodeError at line {e.lineno}, col {e.colno}, pos {e.pos}")
+            logger.error(
+                f"JSONDecodeError at line {e.lineno}, "
+                f"col {e.colno}, pos {e.pos}"
+            )
             # Show context around the error position
             doc = e.doc
             start = max(0, e.pos - 200)
@@ -165,7 +153,9 @@ async def resolve_workspace(
             logger.error(f"Full doc length: {len(doc)} chars")
             # Save full response for debugging
             import tempfile
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+            with tempfile.NamedTemporaryFile(
+                mode='w', delete=False, suffix='.json'
+            ) as f:
                 f.write(doc)
                 logger.error(f"Full response saved to: {f.name}")
 
@@ -185,7 +175,8 @@ async def resolve_workspace(
 
     if hasattr(result, 'output'):
         try:
-            output_repr = repr(result.output)[:200]  # Limit to avoid huge output
+            # Limit to avoid huge output
+            output_repr = repr(result.output)[:200]
             logger.debug(f"Resolution output (truncated): {output_repr}")
             logger.debug(f"Resolution output type: {type(result.output)}")
         except Exception as e:
@@ -207,9 +198,14 @@ async def resolve_workspace(
                         if hasattr(part, 'content'):
                             try:
                                 content_len = len(str(part.content))
-                                logger.debug(f"    Content length: {content_len}")
+                                logger.debug(
+                                    f"    Content length: {content_len}"
+                                )
                             except Exception as e:
-                                logger.debug(f"    Failed to get content length: {e}")
+                                logger.debug(
+                                    f"    Failed to get content "
+                                    f"length: {e}"
+                                )
         except Exception as e:
             logger.debug(f"Failed to process messages: {e}")
 

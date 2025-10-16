@@ -1,436 +1,279 @@
-"""File-based workspace for conflict resolution."""
+"""Workspace and file manipulation tools for conflict resolution."""
 
-from dataclasses import dataclass
+import json
 from pathlib import Path
 
 from pydantic_ai import RunContext
 from pydantic_ai.exceptions import ModelRetry
 
-from splintercat.tools.parser import Conflict
-
-
-@dataclass
-class File:
-    """Metadata for a workspace file."""
-
-    content: str
-    description: str
-    required: bool = False
-
-    @property
-    def line_count(self) -> int:
-        """Count lines in file content."""
-        return len(self.content.splitlines()) if self.content else 0
-
 
 class Workspace:
-    """Workspace containing files for one conflict."""
+    """Workspace for conflict resolution.
 
-    def __init__(self, conflict: Conflict, workspace_id: str):
-        """Initialize workspace from parsed conflict.
+    Provides access to git working directory where conflicts exist.
+    """
 
-        Args:
-            conflict: Parsed conflict data
-            workspace_id: Unique identifier for workspace directory
-        """
-        self.workdir = Path("/tmp") / f"conflict_{workspace_id}"
-        self.workdir.mkdir(parents=True, exist_ok=True)
-
-        # Create file metadata for all workspace files
-        self.files = {
-            "ours": File(
-                content=conflict.ours_content,
-                description=f"Content from our branch ({conflict.ours_ref})",
-                required=False,
-            ),
-            "theirs": File(
-                content=conflict.theirs_content,
-                description=(
-                    f"Content from their branch ({conflict.theirs_ref})"
-                ),
-                required=False,
-            ),
-            "before": File(
-                content="\n".join(conflict.context_before),
-                description=(
-                    "Context before conflict - MUST be first in resolution"
-                ),
-                required=True,
-            ),
-            "after": File(
-                content="\n".join(conflict.context_after),
-                description=(
-                    "Context after conflict - MUST be last in resolution"
-                ),
-                required=True,
-            ),
-        }
-
-        # Add base if present (diff3 format)
-        if conflict.base_content is not None:
-            self.files["base"] = File(
-                content=conflict.base_content,
-                description="Content from merge base (common ancestor)",
-                required=False,
-            )
-
-        # Write all files to disk
-        for filename, file in self.files.items():
-            self._write_to_disk(filename, file.content)
-
-    def _write_to_disk(self, filename: str, content: str):
-        """Write file to workspace directory.
-
-        Args:
-            filename: Name of file to write
-            content: Content to write
-        """
-        (self.workdir / filename).write_text(content)
-
-
-class Tools:
-    """Tools for working with conflict workspace."""
-
-    def __init__(self, workspace: Workspace):
-        """Initialize tools with workspace.
-
-        Args:
-            workspace: Workspace to operate on
-        """
-        self.workspace = workspace
-
-    def list_files(self) -> str:
-        """List all files with descriptions and line counts.
-
-        Returns:
-            Formatted string showing available files
-        """
-        lines = ["Available files in workspace:\n"]
-
-        for filename, file in self.workspace.files.items():
-            lines.append(f"  {filename} ({file.line_count} lines)")
-            lines.append(f"    {file.description}\n")
-
-        return "\n".join(lines)
-
-    def read_file(
+    def __init__(
         self,
-        name: str,
-        start_line: int = 1,
-        end_line: int | None = None
-    ) -> str:
-        """Read file content with line numbers.
+        workdir: Path,
+        conflict_files: list[str],
+        config=None
+    ):
+        """Initialize workspace.
 
         Args:
-            name: Filename to read
-            start_line: First line to read (1-indexed)
-            end_line: Last line to read (None = show first 20 lines)
-
-        Returns:
-            File content with line numbers, or error message
+            workdir: Git working directory containing conflicts
+            conflict_files: List of file paths with conflicts
+            config: Optional configuration object
         """
-        if name not in self.workspace.files:
-            return (
-                f"Error: File '{name}' not found. "
-                f"Use list_files() to see available files."
-            )
-
-        content = self.workspace.files[name].content
-        lines = content.splitlines()
-
-        # Default to first 20 lines if no end specified
-        if end_line is None:
-            end_line = min(len(lines), 20)
-
-        # Extract range (1-indexed)
-        selected_lines = lines[start_line - 1:end_line]
-
-        # Format with line numbers
-        output = []
-        for i, line in enumerate(selected_lines, start=start_line):
-            output.append(f"  {i}: {line}")
-
-        return "\n".join(output)
-
-    def write_file(
-        self,
-        name: str,
-        content: str,
-        description: str = ""
-    ) -> str:
-        """Create new file in workspace.
-
-        Args:
-            name: Filename to create
-            content: File content
-            description: Optional description of file purpose
-
-        Returns:
-            Confirmation message with line count
-        """
-        self.workspace.files[name] = File(
-            content=content,
-            description=description or "User-created file",
-            required=False,
-        )
-        self.workspace._write_to_disk(name, content)
-
-        line_count = len(content.splitlines())
-        return f"Created {name} ({line_count} lines)"
-
-    def cat_files(
-        self,
-        input_files: list[str],
-        output_file: str
-    ) -> str:
-        """Concatenate multiple files into output file.
-
-        Args:
-            input_files: List of filenames to concatenate (in order)
-            output_file: Name of output file to create
-
-        Returns:
-            Confirmation message or error
-        """
-        # Validate all input files exist
-        for filename in input_files:
-            if filename not in self.workspace.files:
-                return f"Error: File '{filename}' not found"
-
-        # Concatenate with newlines between files
-        parts = [
-            self.workspace.files[f].content
-            for f in input_files
-        ]
-        concatenated = "\n".join(parts)
-
-        # Create output file
-        self.workspace.files[output_file] = File(
-            content=concatenated,
-            description=f"Concatenation of {len(input_files)} files",
-            required=False,
-        )
-        self.workspace._write_to_disk(output_file, concatenated)
-
-        line_count = len(concatenated.splitlines())
-        return (
-            f"Created {output_file} ({line_count} lines) "
-            f"from {len(input_files)} files"
-        )
-
-    def submit_resolution(self, filename: str) -> str:
-        """Submit resolution file for validation.
-
-        Args:
-            filename: Name of file containing resolution
-
-        Returns:
-            Resolution content if valid, or error message
-
-        Raises:
-            ModelRetry: If resolution is invalid, with instructions for fixing
-        """
-        if filename not in self.workspace.files:
-            raise ModelRetry(
-                f"File '{filename}' not found. Use list_files() to see available files."
-            )
-
-        resolution = self.workspace.files[filename].content
-        before = self.workspace.files["before"].content
-        after = self.workspace.files["after"].content
-
-        # Validate structure - must include required context
-        if not resolution.startswith(before):
-            raise ModelRetry(
-                "Resolution must start with 'before' content. "
-                f"Current resolution starts with: {resolution[:100]!r}... "
-                f"but should start with: {before[:100]!r}..."
-            )
-
-        if not resolution.endswith(after):
-            raise ModelRetry(
-                "Resolution must end with 'after' content. "
-                f"Current resolution ends with: ...{resolution[-100:]!r} "
-                f"but should end with: ...{after[-100:]!r}"
-            )
-
-        # Return the resolved content
-        return resolution
+        self.workdir = workdir
+        self.conflict_files = conflict_files
+        self.config = config
 
 
 # Pydantic AI compatible standalone tool functions
 
 
-def list_files(ctx: RunContext[Workspace]) -> str:
-    """List all files with descriptions and line counts.
-
-    Returns:
-        Formatted string showing available files
-    """
-    workspace = ctx.deps
-    lines = ["Available files in workspace:\n"]
-
-    for filename, file in workspace.files.items():
-        lines.append(f"  {filename} ({file.line_count} lines)")
-        lines.append(f"    {file.description}\n")
-
-    return "\n".join(lines)
-
-
 def read_file(
     ctx: RunContext[Workspace],
-    name: str,
+    filepath: str,
     start_line: int = 1,
-    end_line: int | None = None
+    num_lines: int = 50
 ) -> str:
-    """Read file content with line numbers.
+    """Read file with line numbers.
 
     Args:
-        name: Filename to read
+        filepath: Path to file (relative to workspace)
         start_line: First line to read (1-indexed)
-        end_line: Last line to read (None = show first 20 lines)
+        num_lines: Number of lines to read (default 50, use -1
+            for entire file)
 
     Returns:
-        File content with line numbers, or error message
+        File content with line numbers: "1: content\\n2: content\\n..."
+
+    Raises:
+        ModelRetry: If file not found or cannot be read
     """
     workspace = ctx.deps
+    file_path = workspace.workdir / filepath
 
-    if name not in workspace.files:
-        return (
-            f"Error: File '{name}' not found. "
-            f"Use list_files() to see available files."
+    if not file_path.exists():
+        raise ModelRetry(
+            f"File '{filepath}' not found in workspace. "
+            f"Use run_command('ls', ['-la']) to see available files."
         )
 
-    content = workspace.files[name].content
+    try:
+        content = file_path.read_text()
+    except Exception as e:
+        raise ModelRetry(f"Failed to read '{filepath}': {e}") from e
+
     lines = content.splitlines()
 
-    # Default to first 20 lines if no end specified
-    if end_line is None:
-        end_line = min(len(lines), 20)
-
-    # Extract range (1-indexed)
-    selected_lines = lines[start_line - 1:end_line]
+    # Determine which lines to show
+    if num_lines == -1:
+        # Show entire file
+        selected_lines = lines[start_line - 1:]
+    else:
+        # Show specified range
+        end_line = start_line + num_lines - 1
+        selected_lines = lines[start_line - 1:end_line]
 
     # Format with line numbers
     output = []
     for i, line in enumerate(selected_lines, start=start_line):
-        output.append(f"  {i}: {line}")
+        output.append(f"{i}: {line}")
 
     return "\n".join(output)
 
 
 def write_file(
     ctx: RunContext[Workspace],
-    name: str,
-    content: str,
-    description: str = ""
+    filepath: str,
+    content: str
 ) -> str:
-    """Create new file in workspace.
+    """Create or completely replace a file.
 
     Args:
-        name: Filename to create
-        content: File content
-        description: Optional description of file purpose
+        filepath: Path to file (relative to workspace)
+        content: File content to write
 
     Returns:
-        Confirmation message with line count
+        Confirmation message with file size
+
+    Raises:
+        ModelRetry: If file cannot be written
     """
     workspace = ctx.deps
+    file_path = workspace.workdir / filepath
 
-    workspace.files[name] = File(
-        content=content,
-        description=description or "User-created file",
-        required=False,
-    )
-    workspace._write_to_disk(name, content)
+    # Create parent directories if needed
+    file_path.parent.mkdir(parents=True, exist_ok=True)
 
+    try:
+        file_path.write_text(content)
+    except Exception as e:
+        raise ModelRetry(f"Failed to write '{filepath}': {e}") from e
+
+    byte_count = len(content.encode('utf-8'))
     line_count = len(content.splitlines())
-    return f"Created {name} ({line_count} lines)"
+    return f"Wrote {byte_count} bytes ({line_count} lines) to {filepath}"
 
 
-def cat_files(
+def concatenate_to_file(
     ctx: RunContext[Workspace],
-    input_files: list[str],
-    output_file: str
+    output_filepath: str,
+    sources: list[str]
 ) -> str:
-    """Concatenate multiple files into output file.
+    """Build output file by concatenating source files in order.
 
     Args:
-        input_files: List of filenames to concatenate (in order)
-        output_file: Name of output file to create
+        output_filepath: Path to output file
+        sources: List of source file paths to concatenate
 
     Returns:
-        Confirmation message or error
+        Confirmation message
+
+    Raises:
+        ModelRetry: If any source file not found or cannot be read
     """
     workspace = ctx.deps
 
-    # Validate all input files exist
-    for filename in input_files:
-        if filename not in workspace.files:
-            return f"Error: File '{filename}' not found"
+    # Read all source files
+    parts = []
+    for source in sources:
+        source_path = workspace.workdir / source
+        if not source_path.exists():
+            raise ModelRetry(
+                f"Source file '{source}' not found. "
+                f"Cannot concatenate."
+            )
+        try:
+            parts.append(source_path.read_text())
+        except Exception as e:
+            raise ModelRetry(
+                f"Failed to read source '{source}': {e}"
+            ) from e
 
     # Concatenate with newlines between files
-    parts = [
-        workspace.files[f].content
-        for f in input_files
-    ]
     concatenated = "\n".join(parts)
 
-    # Create output file
-    workspace.files[output_file] = File(
-        content=concatenated,
-        description=f"Concatenation of {len(input_files)} files",
-        required=False,
-    )
-    workspace._write_to_disk(output_file, concatenated)
+    # Write output
+    output_path = workspace.workdir / output_filepath
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        output_path.write_text(concatenated)
+    except Exception as e:
+        raise ModelRetry(
+            f"Failed to write '{output_filepath}': {e}"
+        ) from e
 
     line_count = len(concatenated.splitlines())
     return (
-        f"Created {output_file} ({line_count} lines) "
-        f"from {len(input_files)} files"
+        f"Created {output_filepath} ({line_count} lines) "
+        f"from {len(sources)} source files"
     )
 
 
 def submit_resolution(
     ctx: RunContext[Workspace],
-    filename: str
+    filepath: str,
+    confirm_size_change: bool = False,
+    confirm_empty: bool = False,
+    skip_syntax_check: bool = False
 ) -> str:
-    """Submit resolution file for validation.
+    """Submit resolved file with validation.
+
+    Performs safety checks:
+    - No conflict markers remain
+    - Syntax validation for Python/JSON/YAML
+    - Size change warnings
+    - Empty file warnings
 
     Args:
-        filename: Name of file containing resolution
+        filepath: Path to resolved file
+        confirm_size_change: Bypass size change warnings
+        confirm_empty: Confirm empty file is intentional
+        skip_syntax_check: Skip syntax validation
 
     Returns:
-        Resolution content if valid
+        Resolution content or deletion confirmation
 
     Raises:
-        ModelRetry: If resolution is invalid, with instructions for fixing
+        ModelRetry: If validation fails with fix instructions
     """
     workspace = ctx.deps
+    file_path = workspace.workdir / filepath
 
-    if filename not in workspace.files:
+    # Check if file was deleted (git rm)
+    if not file_path.exists():
+        # TODO: Check git status to confirm deletion
+        # For now, just confirm the file doesn't exist
+        return f"File {filepath} does not exist (deleted)."
+
+    # Read resolution content
+    try:
+        content = file_path.read_text()
+    except Exception as e:
+        raise ModelRetry(f"Failed to read '{filepath}': {e}") from e
+
+    # Check for conflict markers
+    conflict_markers = ['<<<<<<<', '=======', '>>>>>>>']
+    for marker in conflict_markers:
+        if marker in content:
+            raise ModelRetry(
+                f"Resolution still contains conflict marker '{marker}'. "
+                f"Please remove all conflict markers before submitting."
+            )
+
+    # Check for empty file
+    if not content.strip() and not confirm_empty:
         raise ModelRetry(
-            f"File '{filename}' not found. Use list_files() to see available files."
+            f"Resolution file '{filepath}' is empty. "
+            f"If intentional, call submit_resolution with "
+            f"confirm_empty=True. "
+            f"To delete the file, use: run_command('git', "
+            f"['rm', '{filepath}'])"
         )
 
-    resolution = workspace.files[filename].content
-    before = workspace.files["before"].content
-    after = workspace.files["after"].content
+    # Syntax checking for known file types
+    if not skip_syntax_check:
+        if filepath.endswith('.py'):
+            try:
+                compile(content, filepath, 'exec')
+            except SyntaxError as e:
+                raise ModelRetry(
+                    f"Python syntax error at line {e.lineno}: {e.msg}\n"
+                    f"Please fix the syntax error before submitting."
+                ) from e
 
-    # Validate structure - must include required context
-    if not resolution.startswith(before):
-        raise ModelRetry(
-            "Resolution must start with 'before' content. "
-            f"Current resolution starts with: {resolution[:100]!r}... "
-            f"but should start with: {before[:100]!r}..."
-        )
+        elif filepath.endswith('.json'):
+            try:
+                json.loads(content)
+            except json.JSONDecodeError as e:
+                raise ModelRetry(
+                    f"JSON syntax error at line {e.lineno}: {e.msg}\n"
+                    f"Please fix the JSON syntax before submitting."
+                ) from e
 
-    if not resolution.endswith(after):
-        raise ModelRetry(
-            "Resolution must end with 'after' content. "
-            f"Current resolution ends with: ...{resolution[-100:]!r} "
-            f"but should end with: ...{after[-100:]!r}"
-        )
+        elif filepath.endswith(('.yaml', '.yml')):
+            try:
+                import yaml
+                yaml.safe_load(content)
+            except Exception as e:
+                raise ModelRetry(
+                    f"YAML syntax error: {e}\n"
+                    f"Please fix the YAML syntax before submitting."
+                ) from e
 
-    # Return the resolved content
-    return resolution
+    # TODO: Size change detection (need to compare with original)
+    # For now, just return success
+
+    byte_count = len(content.encode('utf-8'))
+    line_count = len(content.splitlines())
+    return (
+        f"Resolution validated for {filepath}: "
+        f"{byte_count} bytes, {line_count} lines. "
+        f"Content returned."
+    )
