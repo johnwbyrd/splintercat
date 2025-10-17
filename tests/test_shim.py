@@ -314,13 +314,22 @@ class TestEnvParameter:
 
     def test_runner_env_parameter(self):
         """Verify Runner accepts and uses env parameter."""
+        import platform
+
         from splintercat.core.runner import Runner
 
         runner = Runner()
+
+        # Use platform-appropriate syntax for environment variables
+        if platform.system() == "Windows":
+            cmd = "echo %TEST_VAR%"
+        else:
+            cmd = "echo $TEST_VAR"
+
         result = runner.execute(
-            "echo $TEST_VAR",
+            cmd,
             env={"TEST_VAR": "test_value"},
-            check=False
+            check=False,
         )
 
         assert result.exited == 0
