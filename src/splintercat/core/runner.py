@@ -1,5 +1,7 @@
 """Command execution using invoke library with custom extensions."""
 
+import contextlib
+import os
 from pathlib import Path
 
 from invoke import Context, Result
@@ -16,6 +18,55 @@ class Runner(Context):
     built-in functionality. Uses invoke internally for all
     command execution.
     """
+
+    def kill(self) -> None:
+        """Kill the running subprocess.
+
+        This overrides invoke.Context.kill() to work around a bug
+        where invoke tries to use signal.SIGKILL on Windows, which
+        doesn't exist. Windows doesn't support POSIX signals - the
+        signal module only defines CTRL_C_EVENT, CTRL_BREAK_EVENT,
+        and a few others (SIGABRT, SIGFPE, SIGILL, SIGINT, SIGSEGV,
+        SIGTERM).
+
+        The invoke library's kill() method (invoke/runners.py:1350)
+        calls:
+            os.kill(pid, signal.SIGKILL)
+
+        On Windows, this raises:
+            AttributeError: module 'signal' has no attribute
+            'SIGKILL'
+
+        However, os.kill() on Windows accepts numeric values and
+        passes them to TerminateProcess() as exit codes. We use
+        numeric value 9 (SIGKILL's value on Unix) which works
+        correctly on Windows.
+
+        On POSIX systems (Linux, macOS, BSD), delegate to invoke's
+        original implementation which works fine.
+
+        Bug discovered via Windows CI test failures in
+        test_checkrunner.py test_timeout_handling, which triggers
+        timeout cleanup.
+
+        References:
+        - https://bugs.python.org/issue1220212 (os.kill on Windows)
+        - https://bugs.python.org/issue26350 (signal/os.kill
+          Windows docs)
+        - https://github.com/pyinvoke/invoke/blob/main/invoke/
+          runners.py#L1350
+        """
+        import platform
+
+        if platform.system() == "Windows":
+            # Windows doesn't have signal.SIGKILL, use numeric value
+            pid = self.pid if self.using_pty else self.process.pid
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, 9)  # SIGKILL = 9 on Unix, works on Win
+            return
+
+        # On POSIX, use invoke's original implementation
+        super().kill()
 
     def execute(
         self,
