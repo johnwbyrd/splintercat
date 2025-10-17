@@ -5,6 +5,7 @@ include:
   - commands.yaml
   - prompts.yaml
   - agents.yaml
+  - tools.yaml
 
 config:
   # Default strategy settings

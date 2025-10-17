@@ -36,6 +36,15 @@ pip install -e .
 
 After installation, the `splintercat` command will be available in your PATH.
 
+### Platform Support
+
+Splintercat works on Linux, macOS, and Windows:
+
+- **Git**: Works identically across all platforms via Git for Windows (on Windows) or native git
+- **Shell commands**: Platform-specific - POSIX systems (Linux/macOS) use `grep`, `cat`, `ls`, while Windows uses `findstr`, `type`, `dir`
+
+The LLM automatically uses the correct commands for your platform. Commands are configured in YAML files and can be customized per platform.
+
 ## Quick start
 
 Create a `splintercat.yaml` file in your project directory:
@@ -54,8 +63,7 @@ config:
     output_dir: .splintercat/logs
 
   llm:
-    base_url: https://openrouter.ai/api/v1
-    model: openai/gpt-4o
+    model: openai:gpt-4o
 
   strategy:
     name: batch
@@ -100,6 +108,18 @@ Key settings:
 - `config.strategy.batch_size`: How many conflicts to resolve before checking
 
 See [docs/configuration.md](docs/configuration.md) for complete details.
+
+### Using Local Models
+
+To use LocalAI or other OpenAI-compatible endpoints:
+
+```yaml
+llm:
+  base_url: http://localhost:8080/v1
+  model: openai:gemma-3
+```
+
+The `base_url` overrides where the OpenAI provider connects. Model format stays the same.
 
 ## Current status
 

@@ -72,8 +72,7 @@ class ResolveConflicts(BaseNode[State]):
             # LLM has access to all files via commands
             await resolve_workspace(
                 workspace,
-                model=ctx.state.config.llm.model,
-                api_key=ctx.state.config.llm.api_key,
+                llm_config=ctx.state.config.llm,
                 failure_context=failure_context,
             )
 

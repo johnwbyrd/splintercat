@@ -4,25 +4,34 @@ from contextlib import contextmanager
 
 from pydantic_ai import Agent, providers
 
+from splintercat.core.config import LLMConfig
 from splintercat.core.log import logger
 from splintercat.tools import workspace_tools
 from splintercat.tools.workspace import Workspace
 
 
 @contextmanager
-def inject_provider_api_key(api_key: str | None):
-    """Context manager to inject API key into provider creation.
+def inject_provider_params(llm_config: LLMConfig):
+    """Context manager to inject parameters into provider creation.
 
-    Temporarily patches pydantic-AI's infer_provider to pass api_key
-    to provider constructors. Restores original behavior on exit.
+    Temporarily patches pydantic-AI's infer_provider to pass
+    custom parameters to provider constructors. Restores original
+    behavior on exit.
 
     Args:
-        api_key: API key to inject, or None to use default behavior
+        llm_config: LLM configuration with api_key, base_url, etc.
 
     Yields:
         None
     """
-    if not api_key:
+    # Build kwargs from config
+    kwargs = {}
+    if llm_config.api_key:
+        kwargs['api_key'] = llm_config.api_key
+    if llm_config.base_url:
+        kwargs['base_url'] = llm_config.base_url
+
+    if not kwargs:
         # No patching needed
         yield
         return
@@ -31,9 +40,9 @@ def inject_provider_api_key(api_key: str | None):
     original_infer_provider = providers.infer_provider
 
     def patched_infer_provider(provider_name: str):
-        """Infer provider and inject api_key."""
+        """Infer provider and inject parameters."""
         provider_class = providers.infer_provider_class(provider_name)
-        return provider_class(api_key=api_key)
+        return provider_class(**kwargs)
 
     try:
         providers.infer_provider = patched_infer_provider
@@ -43,16 +52,13 @@ def inject_provider_api_key(api_key: str | None):
 
 
 def create_resolver_agent(
-    model: str = "openai:gpt-4o",
-    api_key: str | None = None,
+    llm_config: LLMConfig,
     system_prompt: str | None = None
 ) -> Agent:
     """Create a resolver agent with workspace tools.
 
     Args:
-        model: Model identifier (e.g., 'openai:gpt-4o',
-            'anthropic:claude-3-5-sonnet-20241022')
-        api_key: Optional API key (if None, providers use env vars)
+        llm_config: LLM configuration (model, api_key, base_url, etc.)
         system_prompt: System prompt to use (if None, uses default)
 
     Returns:
@@ -62,9 +68,9 @@ def create_resolver_agent(
     if not system_prompt:
         system_prompt = "You are a git merge conflict resolver."
 
-    with inject_provider_api_key(api_key):
+    with inject_provider_params(llm_config):
         return Agent(
-            model,
+            llm_config.model,
             deps_type=Workspace,
             tools=workspace_tools,
             system_prompt=system_prompt,
@@ -73,16 +79,14 @@ def create_resolver_agent(
 
 async def resolve_workspace(
     workspace: Workspace,
-    model: str = "openai:gpt-4o",
-    api_key: str | None = None,
+    llm_config: LLMConfig,
     failure_context: str | None = None
 ) -> str:
     """Resolve a conflict using workspace and LLM agent.
 
     Args:
         workspace: Workspace containing conflict files
-        model: Model identifier to use
-        api_key: Optional API key (if None, providers use env vars)
+        llm_config: LLM configuration (model, api_key, base_url, etc.)
         failure_context: Optional error context from previous
             attempt
 
@@ -99,12 +103,13 @@ async def resolve_workspace(
         if 'resolver' in prompts and 'system' in prompts['resolver']:
             system_prompt = prompts['resolver']['system']
 
-    logger.debug(f"Creating resolver agent with model: {model}")
-    logger.debug(f"API key provided: {api_key is not None}")
-    if api_key:
-        logger.debug(f"API key prefix: {api_key[:10]}...")
+    logger.debug(f"Creating resolver agent with model: {llm_config.model}")
+    logger.debug(f"API key provided: {llm_config.api_key is not None}")
+    logger.debug(f"Base URL: {llm_config.base_url}")
+    if llm_config.api_key:
+        logger.debug(f"API key prefix: {llm_config.api_key[:10]}...")
 
-    agent = create_resolver_agent(model, api_key, system_prompt)
+    agent = create_resolver_agent(llm_config, system_prompt)
     logger.debug(f"Agent created: {agent}")
     logger.debug(f"Agent model: {agent.model}")
     logger.debug(f"Agent model name: {agent.model.model_name}")

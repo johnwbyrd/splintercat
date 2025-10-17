@@ -1,0 +1,217 @@
+# Platform-specific command configurations for LLM tools
+# Commands are called by their actual names on each platform
+
+config:
+  tools:
+    # POSIX systems (Linux, macOS, BSD, etc.)
+    posix:
+      allowed:
+        # Git version control - works the same across platforms
+        git:
+          has_subcommands: true
+          description: "Git version control"
+          subcommands:
+            status:
+              description: "Show working tree status"
+              allowed_flags: [--porcelain, --short, --branch, -s, -b, -u]
+              allowed_args: []
+
+            show:
+              description: "Show commit or file contents"
+              allowed_flags: [--stat, --oneline, --name-only, --pretty, --format]
+              allowed_args: ["{ref}", ":1:{path}", ":2:{path}", ":3:{path}", "{ref}:{path}"]
+
+            diff:
+              description: "Show changes between commits or files"
+              allowed_flags: [--cached, --staged, --name-only, --stat, --diff-filter, -U, --unified]
+              allowed_args: [":1:{path}", ":2:{path}", ":3:{path}", "{ref}", "{path}"]
+
+            ls-files:
+              description: "List files in the index and working tree"
+              allowed_flags: [-u, -s, -t, -c, -d, -o, -m, --cached, --deleted, --modified, --others]
+              allowed_args: ["{path}"]
+
+            log:
+              description: "Show commit logs"
+              allowed_flags: [--oneline, --graph, --decorate, --all, -n, --max-count, --format, --pretty]
+              allowed_args: ["{ref}", "{path}"]
+
+            add:
+              description: "Stage file contents for commit"
+              allowed_flags: [-A, --all, -u, --update, -f, --force]
+              allowed_args: ["{path}"]
+
+            rm:
+              description: "Remove files from working tree and index"
+              allowed_flags: [-f, --force, -r, --recursive, --cached]
+              allowed_args: ["{path}"]
+
+            checkout:
+              description: "Switch branches or restore files"
+              allowed_flags: [--ours, --theirs, -f, --force]
+              allowed_args: ["{path}", "{ref}", "--", "{path}"]
+
+            cat-file:
+              description: "Provide content or type info for repository objects"
+              allowed_flags: [-p, -t, -s, -e]
+              allowed_args: ["{object}"]
+
+            rev-parse:
+              description: "Parse and validate git references"
+              allowed_flags: [--short, --abbrev-ref, --symbolic-full-name, --verify]
+              allowed_args: ["{ref}"]
+
+            merge-base:
+              description: "Find common ancestor of commits"
+              allowed_flags: [--all]
+              allowed_args: ["{ref1}", "{ref2}"]
+
+            diff-tree:
+              description: "Compare tree objects"
+              allowed_flags: [-r, --no-commit-id, --name-only, --name-status]
+              allowed_args: ["{ref}", "{path}"]
+
+          blacklist:
+            subcommands: [push, pull, fetch, clone, init, config, remote, submodule, filter-branch, rebase, merge, commit, reset, clean, branch, tag, stash, cherry-pick, revert]
+
+        grep:
+          description: "Search text using patterns"
+          allowed_flags: [-n, -i, -v, -A, -B, -C, -E, -F, -w, -c, -l, -L, -H, -h, -r, -R, --color]
+          allowed_args: ["{pattern}", "{file}"]
+
+        find:
+          description: "Search for files"
+          allowed_flags: [-name, -type, -maxdepth, -mindepth, -size, -mtime, -newer, -perm]
+          allowed_args: ["{path}", "{pattern}"]
+
+        ls:
+          description: "List directory contents"
+          allowed_flags: [-l, -a, -h, -t, -r, -1, -R, -S, -d]
+          allowed_args: ["{path}"]
+
+        cat:
+          description: "Display file contents"
+          allowed_flags: [-n, -b, -s, -E, -T]
+          allowed_args: ["{file}"]
+
+        head:
+          description: "Output first part of files"
+          allowed_flags: [-n, -c, -q, -v]
+          allowed_args: ["{file}"]
+
+        tail:
+          description: "Output last part of files"
+          allowed_flags: [-n, -c, -q, -v, -f]
+          allowed_args: ["{file}"]
+
+        wc:
+          description: "Count lines, words, characters"
+          allowed_flags: [-l, -w, -c, -m, -L]
+          allowed_args: ["{file}"]
+
+        file:
+          description: "Determine file type"
+          allowed_flags: [-b, -i, -k, -L, -z]
+          allowed_args: ["{file}"]
+
+        pwd:
+          description: "Print working directory"
+          allowed_flags: [-L, -P]
+          allowed_args: []
+
+      blacklist:
+        commands: [rm, mv, cp, chmod, chown, sudo, su, dd, mkfs, fdisk]
+
+    # Windows systems
+    windows:
+      allowed:
+        # Git works the same on Windows via Git for Windows
+        git:
+          has_subcommands: true
+          description: "Git version control (Git for Windows)"
+          subcommands:
+            status:
+              description: "Show working tree status"
+              allowed_flags: [--porcelain, --short, --branch, -s, -b, -u]
+              allowed_args: []
+
+            show:
+              description: "Show commit or file contents"
+              allowed_flags: [--stat, --oneline, --name-only, --pretty, --format]
+              allowed_args: ["{ref}", ":1:{path}", ":2:{path}", ":3:{path}", "{ref}:{path}"]
+
+            diff:
+              description: "Show changes between commits or files"
+              allowed_flags: [--cached, --staged, --name-only, --stat, --diff-filter, -U, --unified]
+              allowed_args: [":1:{path}", ":2:{path}", ":3:{path}", "{ref}", "{path}"]
+
+            ls-files:
+              description: "List files in the index and working tree"
+              allowed_flags: [-u, -s, -t, -c, -d, -o, -m, --cached, --deleted, --modified, --others]
+              allowed_args: ["{path}"]
+
+            log:
+              description: "Show commit logs"
+              allowed_flags: [--oneline, --graph, --decorate, --all, -n, --max-count, --format, --pretty]
+              allowed_args: ["{ref}", "{path}"]
+
+            add:
+              description: "Stage file contents for commit"
+              allowed_flags: [-A, --all, -u, --update, -f, --force]
+              allowed_args: ["{path}"]
+
+            rm:
+              description: "Remove files from working tree and index"
+              allowed_flags: [-f, --force, -r, --recursive, --cached]
+              allowed_args: ["{path}"]
+
+            checkout:
+              description: "Switch branches or restore files"
+              allowed_flags: [--ours, --theirs, -f, --force]
+              allowed_args: ["{path}", "{ref}", "--", "{path}"]
+
+            cat-file:
+              description: "Provide content or type info for repository objects"
+              allowed_flags: [-p, -t, -s, -e]
+              allowed_args: ["{object}"]
+
+            rev-parse:
+              description: "Parse and validate git references"
+              allowed_flags: [--short, --abbrev-ref, --symbolic-full-name, --verify]
+              allowed_args: ["{ref}"]
+
+            merge-base:
+              description: "Find common ancestor of commits"
+              allowed_flags: [--all]
+              allowed_args: ["{ref1}", "{ref2}"]
+
+            diff-tree:
+              description: "Compare tree objects"
+              allowed_flags: [-r, --no-commit-id, --name-only, --name-status]
+              allowed_args: ["{ref}", "{path}"]
+
+          blacklist:
+            subcommands: [push, pull, fetch, clone, init, config, remote, submodule, filter-branch, rebase, merge, commit, reset, clean, branch, tag, stash, cherry-pick, revert]
+
+        findstr:
+          description: "Search text in files (Windows)"
+          allowed_flags: [/N, /I, /V, /R, /C]
+          allowed_args: ["{pattern}", "{file}"]
+
+        type:
+          description: "Display file contents (Windows)"
+          allowed_flags: []
+          allowed_args: ["{file}"]
+
+        dir:
+          description: "List directory contents (Windows)"
+          allowed_flags: [/A, /B, /S, /O, /P]
+          allowed_args: ["{path}"]
+
+        where:
+          description: "Locate files (Windows)"
+          allowed_flags: [/R, /Q, /F, /T]
+          allowed_args: ["{path}", "{pattern}"]
+
+      blacklist:
+        commands: [del, erase, format, rmdir, rd, deltree, powercfg, shutdown, reg]

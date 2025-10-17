@@ -93,8 +93,9 @@ class LLMConfig(BaseConfig):
     """LLM provider and model selection."""
     model: str = Field(
         description=(
-            "Model for conflict resolution "
-            "(e.g., openai/gpt-4o, anthropic/claude-sonnet-4)"
+            "Model for conflict resolution. "
+            "Format: 'provider:model' (e.g., openai:gpt-4o, "
+            "openrouter/anthropic/claude-sonnet-4)"
         )
     )
     api_key: str | None = Field(
@@ -103,6 +104,13 @@ class LLMConfig(BaseConfig):
             "API key for LLM provider. If not set, provider will "
             "look for provider-specific environment variables "
             "(e.g., OPENAI_API_KEY, OPENROUTER_API_KEY)"
+        )
+    )
+    base_url: str | None = Field(
+        default=None,
+        description=(
+            "Override API base URL for custom OpenAI-compatible endpoints "
+            "(e.g., LocalAI at http://localhost:8080/v1)"
         )
     )
 
@@ -174,6 +182,10 @@ class Config(BaseModel):
     agents: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         description="Agent configuration for resolver",
+    )
+    tools: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Platform-specific tool command definitions",
     )
 
 

@@ -10,11 +10,12 @@ from splintercat.tools.workspace import Workspace
 
 
 @pytest.fixture
-def temp_workspace(tmp_path):
-    """Create a temporary workspace."""
+def temp_workspace(tmp_path, test_config):
+    """Create a temporary workspace with test configuration."""
     workspace = Workspace(
         workdir=tmp_path,
-        conflict_files=[]
+        conflict_files=[],
+        config=test_config
     )
     return workspace
 
@@ -70,7 +71,7 @@ def test_command_whitelisting(mock_ctx):
     """Test that non-whitelisted commands are rejected."""
     from pydantic_ai.exceptions import ModelRetry
 
-    with pytest.raises(ModelRetry, match="not allowed"):
+    with pytest.raises(ModelRetry, match="blacklisted"):
         run_command(mock_ctx, 'rm', ['-rf', '/'])
 
 
@@ -78,5 +79,5 @@ def test_git_subcommand_validation(mock_ctx):
     """Test that invalid git subcommands are rejected."""
     from pydantic_ai.exceptions import ModelRetry
 
-    with pytest.raises(ModelRetry, match="not allowed"):
+    with pytest.raises(ModelRetry, match="blacklisted"):
         run_command(mock_ctx, 'git', ['push', 'origin', 'main'])

@@ -1,5 +1,7 @@
 """Pytest configuration and fixtures for splintercat tests."""
 
+import sys
+
 import pytest
 
 from splintercat.core.log import logger
@@ -13,3 +15,27 @@ def configure_logging():
     authentication or sending logs to logfire.dev.
     """
     logger.setup(min_log_level='debug')
+
+
+@pytest.fixture(scope="session")
+def test_config():
+    """Load configuration for tests without CLI parsing conflicts.
+
+    Creates a State object with full configuration loading, but
+    temporarily replaces sys.argv to avoid conflicts with pytest's
+    command line arguments.
+
+    Returns:
+        Config object with all settings loaded from defaults
+    """
+    from splintercat.core.config import State
+
+    # Temporarily replace sys.argv to avoid CLI parsing conflicts
+    old_argv = sys.argv
+    sys.argv = ['splintercat']  # Minimal argv that satisfies parsers
+
+    try:
+        state = State()
+        return state.config
+    finally:
+        sys.argv = old_argv
