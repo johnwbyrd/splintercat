@@ -1,167 +1,139 @@
-# TODO: Splintercat Implementation
+# Splintercat: TODO
 
 ## Current Status
 
-The architecture has been simplified to focus on a minimal viable product:
-- Removed: Planner LLM, Summarizer LLM, complex recovery strategies
-- Strategy selection is now deterministic (configured by user)
-- Failure recovery is simple retry-with-error-context
-- Single LLM model handles all conflict resolution
+MVP is functionally complete. Core workflow, LLM resolver, workspace tools, git integration, and configuration system are implemented and tested. Ready for real-world validation.
 
-## Simplified Architecture
+## What Needs to Be Done
 
-**Workflow**: Initialize → ResolveConflicts → Check → [retry or next batch or finalize]
+### Immediate: End-to-End Validation
 
-**Components**:
-- One LLM model (resolver)
-- Three strategies (optimistic, batch, per_conflict) - user configured
-- Simple retry mechanism with error context
-- Four workflow nodes (Initialize, ResolveConflicts, Check, Finalize)
+**Test on Real Merge**
+- Set up small test merge (5-10 conflicts) in separate repository
+- Run complete workflow: Initialize → ResolveConflicts → Check → Finalize
+- Verify LLM successfully uses workspace tools to resolve conflicts
+- Test retry mechanism with intentional build failure
+- Measure execution time and identify bottlenecks
+- Document any failures or edge cases discovered
 
-## Next Steps
+**Validate All Three Strategies**
+- Test optimistic strategy (resolve all, check once)
+- Test batch strategy with N=5
+- Test per-conflict strategy (check after each)
+- Compare tradeoffs: speed vs isolation vs retry frequency
 
-### Phase 1: Implement Resolver (MVP Core)
+**Expected Outcomes**
+- Identify missing features or edge cases
+- Discover LLM tool usage issues
+- Find gaps in error handling
+- Validate that retry-with-error-context works
+- Determine if investigation tools are needed
 
-**File-Based Workspace System**
-- ConflictWorkspace class: Creates /tmp/conflict_xyz/ directories
-- Conflict parsing: Extract base.txt, ours.txt, theirs.txt from hunks
-- Context extraction: before.txt and after.txt (both required)
-- FileMetadata: Track content, description, line_count, required flag
+### If Real Testing Shows Need
 
-**Workspace Tools (src/tools/conflict.py)**
-- list_files(): Show available files with descriptions and line counts
-- read_file(name, start_line, end_line): Read file with line numbers
-- write_file(name, content, description): Create new workspace files
-- cat_files(input_files, output_file): Concatenate files in order
-- submit_resolution(filename): Validate and apply resolution to git
+**Token Cost Tracking**
+- Add explicit tracking if logfire instrumentation insufficient
+- Calculate cost per conflict, per merge
+- Add cost limits and warnings
 
-**Resolver Model (src/model/resolver.py)**
-- Initialize LLM client (OpenAI/OpenRouter API)
-- Bind workspace tools to LLM for function calling
-- Implement conversation loop with tool execution
-- Parse YAML decision format from LLM responses
-- Pass error context on retry (from last_failed_check)
-- Apply submitted resolution and stage with git
+**Investigation Tools** (implement only if resolver fails without them)
+- git_show_commit(ref, file): View commit details
+- git_log(file, max_count): Recent history for context
+- show_merge_summary(): Merge overview
+- list_all_conflicts(): All hunks in merge
+- grep_codebase(pattern): Search repository
+- grep_in_file(file, pattern): Search specific file
 
-**ResolveConflicts Node Implementation**
-- Get conflicts from imerge.get_current_conflict()
-- For each file with conflicts, parse hunks into sections
-- Create ConflictWorkspace for each hunk
-- Initialize resolver with workspace tools
-- Execute resolution conversation loop
-- Respect strategy.should_check_now() for batching
-- Track conflicts in batch for retry purposes
-- Update conflicts_remaining from imerge state
+**Better Error Messages**
+- Distinguish LLM API errors from git errors from check errors
+- Provide actionable remediation suggestions
+- Better handling of malformed LLM responses
 
-### Phase 2: End-to-End Testing
+**Performance Optimization**
+- If LLM context too large: implement smarter context windowing
+- If conflict resolution slow: consider caching git operations
+- If check commands timeout: add timeout configuration per check
 
-**Test with Real Merge**
-- Use small merge (5-10 conflicts)
-- Verify complete workflow: Initialize → ResolveConflicts → Check →
-  Finalize
-- Test retry on build failure with error context
-- Measure: time, token cost, success rate
-- Inspect workspace files in /tmp after resolution
+### Documentation Updates
 
-**Test Strategy Variations**
-- Optimistic: resolve all conflicts, check once
-- Batch (N=5): resolve 5 conflicts, check, repeat
-- Per-conflict: resolve 1 conflict, check immediately, repeat
-- Compare: speed vs debuggability tradeoff
+**README.md**
+- Update status from "Resolver implementation in progress" to "Ready for testing"
+- Add note about workspace approach (git workdir not /tmp)
+- Update quick start with real example config
 
-**Optional: Validation Tools Enhancement**
-- Add build() tool: Test compilation without submitting resolution
-- Add test() tool: Run tests without submitting resolution
-- Measure: Do they improve accuracy for complex merges?
-- Only keep if demonstrably helpful (YAGNI principle)
+**design.md**
+- Document actual workspace implementation vs original design
+- Explain tool-based approach vs file extraction
+- Update to match implementation reality
 
-### Phase 3: Investigation Tools (Add as Needed)
+**Example Configs**
+- Add example for LLVM-style large merge
+- Add example for small library merge
+- Add example with multiple check levels
+- Document strategy selection guidance
 
-Core workspace tools (list, read, write, cat, submit) are sufficient
-for basic conflict resolution. Investigation tools help the LLM
-understand intent and impact of changes. Add only when resolver fails
-without them.
+### LLVM-MOS Production Test
 
-**Git Investigation Tools**
-- git_show_commit(ref, file): View commit message and changes
-- git_log(file, max_count): View recent commit history
-- show_merge_summary(): Overview of entire merge operation
-- list_all_conflicts(): List all conflict hunks in merge
-- Add only if resolver fails without commit context
+**When Small Merges Work**
+- Test on real LLVM-MOS merge (100+ commits, 20+ conflicts)
+- Use batch strategy with tuned batch size
+- Full logging and observability
+- Measure: time, tokens, success rate, retry frequency
+- Document systematic failures if any
+- Identify patterns in conflict types and resolution quality
 
-**Codebase Search Tools**
-- grep_codebase(pattern, file_pattern, context): Search repository
-- grep_in_file(file, pattern, context): Search within specific file
-- Add only if resolver needs to find related code
+**Iterate Based on Results**
+- Add investigation tools if patterns show they'd help
+- Tune prompts based on resolution quality
+- Adjust strategies based on retry patterns
+- Document best practices for different merge scenarios
 
-**Measure Impact**
-- Test resolver accuracy with/without investigation tools
-- Only keep tools that demonstrably improve success rate
-- Track token costs - investigation tools add context
+### Future Enhancements (Low Priority)
 
-### Phase 4: Polish
+**User Experience**
+- Progress indicators for long operations
+- Interactive mode to review LLM decisions before applying
+- Dry-run mode to preview without committing
+- Better visualization of merge state
 
-**Logging and Observability**
-- Log LLM calls with token counts and costs
-- Log resolution decisions with reasoning from YAML
-- Log strategy batch boundaries
-- Log retry attempts with error context
-- Log workspace file operations (created, concatenated, submitted)
-- Preserve workspace directories for post-mortem analysis
+**Advanced Recovery**
+- If simple retry insufficient: implement bisect recovery
+- If batch sizes wrong: implement adaptive batch sizing
+- If specific conflicts problematic: implement retry-specific recovery
 
-**Error Handling**
-- LLM API errors (rate limit, timeout, invalid key, malformed
-  response)
-- git-imerge errors (unclean tree, name exists, invalid state)
-- Check command errors (timeout, command not found, non-zero exit)
-- Workspace errors (invalid file concatenation, missing required
-  files)
-- Validation errors (resolution doesn't include before/after context)
+**Multiple Check Levels**
+- If single check inadequate: add quick/normal/full check levels
+- Planner to choose appropriate check based on confidence
+- Skip expensive checks when confidence high
 
-**Documentation**
-- Update README with file-based workspace approach
-- Update design.md to reflect implemented architecture
-- Update configuration.md with all current config fields
-- Add example splintercat.yaml configs for different use cases
-- Document workspace file format and tool usage patterns
+## Not Planned (YAGNI)
 
-### Phase 5: Real-World Validation
+These were removed as speculative. Only implement if evidence from real merges demonstrates need:
 
-**LLVM-MOS Merge Test**
-- Large merge (100+ commits, 20+ conflicts)
-- Use batch strategy with appropriate batch size
-- Measure: total time, LLM token costs, success rate, human
-  intervention needed
-- Identify failure modes and patterns
-- Analyze workspace artifacts from failed resolutions
-- Iterate based on empirical results
+**Planner LLM**: Strategy selection is user-configured
+**Summarizer LLM**: Raw error logs work for retry context
+**Complex recovery strategies**: Simple retry first
+**Automatic strategy switching**: User configures strategy
+**ML/learning from history**: No evidence this helps yet
 
-## Deferred Until Proven Necessary
+## Current Blockers
 
-These were removed as speculative complexity. Add back only with evidence:
-- **Planner LLM**: Strategy selection is now user-configured
-- **Summarizer LLM**: Pass raw error logs to resolver on retry
-- **Complex recovery**: Only simple retry implemented
-- **Multiple check levels**: Start with one check command
+**None.** System is ready for real-world testing. Next step is running actual merges to discover what needs improvement.
 
-## Known Issues
+## Design Decisions
 
-- Resolver model is stub (pass statements only)
-- ResolveConflicts node is stub (doesn't call resolver)
-- ConflictWorkspace class not implemented
-- Workspace tools not implemented (list_files, read_file, write_file,
-  cat_files, submit_resolution)
-- Conflict hunk parsing not implemented (extract base/ours/theirs from
-  git markers)
-- No LLM client integration
-- No tests beyond CheckRunner
-- No cost tracking (tokens, API calls, dollars)
-- No LLM token usage logging
-- Workspace directory cleanup not implemented
+### Workspace Uses Git Workdir
 
-## Architecture
+LLM operates directly on git working directory where conflicts exist, not extracted files in /tmp. Simpler and allows git commands for investigation.
 
-- Initialize: Start imerge, create strategy from config
-- ResolveConflicts: Call resolver until strategy says check
-- Check: Run checks, on failure retry with error context
-- Finalize: Call imerge.finalize() to create merge commit
+### Investigation Tools Deferred
+
+Core 6 workspace tools sufficient for basic resolution. Investigation tools (git_show_commit, grep, etc.) add complexity and token cost. Only implement when evidence shows they improve success rate.
+
+### Simple Retry Mechanism
+
+Pass error log to resolver on failure. Let LLM learn from errors. More complex recovery (bisect, switch-strategy) only if this proves insufficient.
+
+### User-Configured Strategy
+
+User chooses optimistic/batch/per-conflict based on merge size and risk tolerance. No LLM planner needed - it's a straightforward engineering tradeoff.

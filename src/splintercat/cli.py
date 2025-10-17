@@ -39,7 +39,7 @@ class CliState(State):
         provided."""
         # Setup logging based on verbose flag
         from splintercat.core.log import logger
-        logger.setup(self.config.verbose)
+        logger.setup(self.config.log_level)
 
         subcommand = get_subcommand(self, is_required=False)
 
