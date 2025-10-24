@@ -36,14 +36,19 @@ def test_config_reference_templates_substituted(fixtures_dir, mock_argv):
     )
     data = source()
 
-    # Manually check that templates would be substituted
-    # The actual substitution happens in State._substitute_string
-    # during model_validator, not during YAML loading
+    # Raw YAML data should contain templates (not yet substituted)
+    assert "{config.llm.model}" in str(data)
 
-    # For now, verify that template-like strings exist in data
-    # (they'll be substituted later by State validator)
-    # Raw data shouldn't have templates
-    assert "{config.git.target_workdir}" not in str(data)
+    # Now create a full State object which triggers model_validator
+    # that substitutes templates
+    state = State(**data)
+
+    # After State construction, templates should be substituted
+    # {config.llm.model} should be replaced with actual model value
+    agents_str = str(state.config.agents)
+    assert "{config.llm.model}" not in agents_str
+    # The actual model value should be present in the resolver config
+    assert state.config.agents["resolver"]["model"] != "{config.llm.model}"
 
 
 def test_runtime_parameter_templates_preserved(fixtures_dir):

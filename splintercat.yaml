@@ -51,12 +51,13 @@ config:
     # of supported providers.  See your provider for a list of available models.
     # Your particular provider will probably require an API key, which you can
     # set in the environment variable for that provider (e.g. OPENAI_API_KEY).
-    model: openrouter:anthropic/claude-sonnet-4.5
+    model: openai:qwen2.5-coder-32b-instruct
     # The API key for your provider.  You may, if you prefer, set this as an 
     # environment variable instead of in the config file.  See 
     # https://ai.pydantic.dev/models/ for information your environment variable
     # to set, if you do not want to do this here.
     # api_key: sk-or-v1-xxxxxxxxxxx
+    base_url: http://localhost:8081/v1
 
 
   # ==============================================================================

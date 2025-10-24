@@ -37,10 +37,6 @@ class CliState(State):
     def cli_cmd(self):
         """Dispatch to active subcommand, or show help if none
         provided."""
-        # Setup logging based on verbose flag
-        from splintercat.core.log import logger
-        logger.setup(self.config.log_level)
-
         subcommand = get_subcommand(self, is_required=False)
 
         if subcommand is None:
@@ -48,6 +44,26 @@ class CliState(State):
             import sys
             CliApp.run(CliState, cli_args=['--help'])
             sys.exit(1)
+
+        # Setup logging with file output for this command
+        from pathlib import Path
+
+        from splintercat.core.log import logger
+
+        # Get command name (merge, reset, etc.)
+        command_name = (
+            subcommand.__class__.__name__.replace('Command', '').lower()
+        )
+
+        # Extract project name from target_workdir for log organization
+        project_name = Path(self.config.git.target_workdir).name
+
+        logger.setup(
+            self.config.log_level,
+            agent_log_dir=Path(self.config.agent_log_dir),
+            command=command_name,
+            project_name=project_name
+        )
 
         # self IS State with all config loaded
         # Pass self to the command's run_workflow method

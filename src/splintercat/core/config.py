@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
 
+import platformdirs
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_settings import (
     BaseSettings,
@@ -14,6 +16,18 @@ from pydantic_settings import (
 )
 
 from splintercat.core.yaml_settings import YamlWithIncludesSettingsSource
+
+# ============================================================
+# TEMPLATE SUBSTITUTION NAMESPACE
+# ============================================================
+
+# Modules available for template substitution in YAML files
+# Usage: {platformdirs.user_log_dir}, {os.getcwd}, {Path.cwd}
+TEMPLATE_NAMESPACE = {
+    'os': os,
+    'platformdirs': platformdirs,
+    'Path': Path,
+}
 
 # ============================================================
 # BASE CLASSES (semantic markers for readers)
@@ -165,6 +179,12 @@ class Config(BaseModel):
     interactive: bool = Field(
         default=False,
         description="Prompt before each command execution",
+    )
+    agent_log_dir: Path = Field(
+        description=(
+            "Directory for storing agent execution logs "
+            "(supports {platformdirs.*}, {config.*}, etc. templates)"
+        ),
     )
 
     # Command templates, prompts, and agent definitions
@@ -326,7 +346,7 @@ class State(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        yaml_file="config.yaml",
+        yaml_file="splintercat.yaml",
         env_file=".env",
         env_prefix="SPLINTERCAT_",
         env_nested_delimiter="__",
@@ -433,22 +453,34 @@ class State(BaseSettings):
         Returns:
             String with templates replaced by actual values
 
-        Example:
+        Examples:
             "{config.git.target_workdir}/build"
             → "/home/user/repo/build"
+            "{platformdirs.user_log_dir}"
+            → "~/.local/state/splintercat/log"
         """
         def replace_template(match):
             field_path = match.group(1)
             parts = field_path.split(".")
 
-            # Navigate through nested fields starting from self
-            obj = self
+            # Check if first part is a module from TEMPLATE_NAMESPACE
+            if parts[0] in TEMPLATE_NAMESPACE:
+                obj = TEMPLATE_NAMESPACE[parts[0]]
+                parts = parts[1:]  # Skip module name
+            else:
+                obj = self
+
             try:
                 for part in parts:
                     obj = getattr(obj, part)
+
+                # If resolved object is callable, call it
+                if callable(obj):
+                    obj = obj('splintercat', appauthor=False)
+
                 return str(obj)
-            except AttributeError:
-                # Not a config reference, leave unchanged
+            except (AttributeError, TypeError):
+                # Not a valid reference, leave unchanged
                 return match.group(0)
 
         return re.sub(r'\{([a-z._]+)\}', replace_template, value)
