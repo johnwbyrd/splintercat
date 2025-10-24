@@ -53,13 +53,15 @@ def inject_provider_params(llm_config: LLMConfig):
 
 def create_resolver_agent(
     llm_config: LLMConfig,
-    system_prompt: str | None = None
+    system_prompt: str | None = None,
+    retries: int = 5
 ) -> Agent:
     """Create a resolver agent with workspace tools.
 
     Args:
         llm_config: LLM configuration (model, api_key, base_url, etc.)
         system_prompt: System prompt to use (if None, uses default)
+        retries: Maximum retries for output validation (default 5)
 
     Returns:
         Configured Agent ready to resolve conflicts
@@ -74,6 +76,7 @@ def create_resolver_agent(
             deps_type=Workspace,
             tools=workspace_tools,
             system_prompt=system_prompt,
+            retries=retries,
         )
 
 
@@ -103,13 +106,21 @@ async def resolve_workspace(
         if 'resolver' in prompts and 'system' in prompts['resolver']:
             system_prompt = prompts['resolver']['system']
 
+    # Get retries from config
+    retries = 5  # Default
+    if workspace.config and hasattr(workspace.config, 'agents'):
+        agents = workspace.config.agents
+        if 'resolver' in agents and 'retries' in agents['resolver']:
+            retries = agents['resolver']['retries']
+
     logger.debug(f"Creating resolver agent with model: {llm_config.model}")
     logger.debug(f"API key provided: {llm_config.api_key is not None}")
     logger.debug(f"Base URL: {llm_config.base_url}")
     if llm_config.api_key:
         logger.debug(f"API key prefix: {llm_config.api_key[:10]}...")
+    logger.debug(f"Retries: {retries}")
 
-    agent = create_resolver_agent(llm_config, system_prompt)
+    agent = create_resolver_agent(llm_config, system_prompt, retries)
     logger.debug(f"Agent created: {agent}")
     logger.debug(f"Agent model: {agent.model}")
     logger.debug(f"Agent model name: {agent.model.model_name}")

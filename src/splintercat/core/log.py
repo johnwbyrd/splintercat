@@ -21,7 +21,10 @@ def setup(min_log_level: str = 'info'):
     from logfire import ConsoleOptions
 
     logfire.configure(
-        console=ConsoleOptions(min_log_level=min_log_level)
+        console=ConsoleOptions(
+            min_log_level=min_log_level,
+            verbose=True  # Show full span details including tool calls and arguments
+        )
     )
     # Instrument pydantic-AI to trace all agent runs, model
     # requests, and tool calls

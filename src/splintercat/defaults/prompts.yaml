@@ -53,8 +53,12 @@ config:
            IMPORTANT: Never write entire large files (>200 lines).
            Build incrementally or use git checkout as base.
 
-        5. Submit:
+        5. Submit (REQUIRED - FINAL STEP):
            submit_resolution('path')
+
+           CRITICAL: You MUST call submit_resolution() to complete the task.
+           This validates your resolution and returns the result.
+           The workflow will FAIL if you don't call this function.
 
         CONFLICT TYPES:
         - UU (both modified): File has conflict markers (<<<<<<<, =======, >>>>>>>), merge the changes
