@@ -83,7 +83,7 @@ Run the merge:
 splintercat merge
 ```
 
-The system will resolve conflicts, run your tests, and handle failures automatically. Check `splintercat.log` for detailed progress.
+The system will resolve conflicts, run your tests, and handle failures automatically. Detailed agent logs are written to platform-specific directories (configurable via `config.agent_log_dir`).
 
 ## Configuration
 
@@ -103,7 +103,7 @@ Key settings:
 - `config.git.source_ref`: What branch to merge from
 - `config.git.target_branch`: What branch to merge into
 - `config.check.commands`: Your build/test commands
-- `config.llm.model`: LLM model for conflict resolution (e.g., openai/gpt-4o)
+- `config.llm.model`: LLM model for conflict resolution (e.g., openai:gpt-4o)
 - `config.strategy.name`: Strategy (optimistic, batch, or per_conflict)
 - `config.strategy.batch_size`: How many conflicts to resolve before checking
 

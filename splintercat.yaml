@@ -51,7 +51,7 @@ config:
     # of supported providers.  See your provider for a list of available models.
     # Your particular provider will probably require an API key, which you can
     # set in the environment variable for that provider (e.g. OPENAI_API_KEY).
-    model: openai:qwen2.5-coder-32b-instruct
+    model: openai:qwen2.5-coder-14b-instruct
     # The API key for your provider.  You may, if you prefer, set this as an 
     # environment variable instead of in the config file.  See 
     # https://ai.pydantic.dev/models/ for information your environment variable
