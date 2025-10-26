@@ -282,6 +282,7 @@ class Logger(BaseConfig):
 
         # Configure logfire with all sinks
         logfire.configure(
+            service_name=f"splintercat-{merge_name}",
             send_to_logfire=self.logfire.enabled,
             token=self.logfire.token if self.logfire.enabled else None,
             console=console_config,

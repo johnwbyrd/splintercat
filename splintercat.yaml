@@ -60,6 +60,33 @@ config:
     base_url: http://localhost:8081/v1
 
   # ==============================================================================
+  # LOGGER - Logging output configuration
+  # ==============================================================================
+  logger:
+    # Console output (stdout/stderr)
+    console:
+      enabled: true
+      min_level: info  # trace, debug, info, warn, error
+      verbose: true
+      colors: auto  # auto, always, never
+
+    # File output
+    file:
+      enabled: true
+      path: "{log_root}/{merge_name}/splintercat.log"
+      min_level: debug
+
+    # OTLP telemetry export (SigNoz, Jaeger, etc.)
+    otlp:
+      enabled: true
+      endpoint: http://signoz.lan:4317
+      insecure: true
+
+    # Logfire.dev cloud logging
+    logfire:
+      enabled: false
+
+  # ==============================================================================
   # GLOBAL FLAGS
   # ==============================================================================
   verbose: false  # Set to true for DEBUG level console output
