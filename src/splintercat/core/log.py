@@ -3,6 +3,78 @@
 from pathlib import Path
 
 import logfire
+from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor
+from opentelemetry.sdk.trace.export import SpanExporter
+
+
+# Category-specific logger wrapper
+class CategoryLogger:
+    """Logger wrapper that auto-tags all output with a category.
+
+    Forwards all logfire methods but automatically adds category tag.
+    """
+
+    def __init__(self, category: str, parent_logger):
+        """Initialize category logger.
+
+        Args:
+            category: Category name for tagging
+            parent_logger: Parent Logger instance to forward calls to
+        """
+        self.category = category
+        self.parent = parent_logger
+
+    def __getattr__(self, name):
+        """Forward logfire methods with automatic category tagging."""
+        original_method = getattr(self.parent, name)
+
+        def wrapped(*args, **kwargs):
+            # Add category tag to existing tags
+            tags = kwargs.get('_tags', [])
+            kwargs['_tags'] = [*tags, f"category:{self.category}"]
+            return original_method(*args, **kwargs)
+
+        return wrapped
+
+
+# Filtering span processor for category routing
+class FilteringSpanProcessor(SpanProcessor):
+    """Span processor that filters spans by category tag.
+
+    Only exports spans tagged with the matching category.
+    """
+
+    def __init__(self, exporter: SpanExporter, category: str):
+        """Initialize filtering processor.
+
+        Args:
+            exporter: The exporter to send matching spans to
+            category: Export spans tagged with this category
+        """
+        self.exporter = exporter
+        self.category = category
+        self.category_tag = f"category:{category}"
+
+    def on_start(self, span, parent_context=None):
+        """Called when span starts - no filtering needed."""
+        pass
+
+    def on_end(self, span: ReadableSpan):
+        """Called when span ends - filter and export if matches."""
+        # Check if span has matching category tag
+        # Tags are stored in 'logfire.tags' attribute
+        if span.attributes:
+            tags = span.attributes.get('logfire.tags', ())
+            if isinstance(tags, (list, tuple)) and self.category_tag in tags:
+                self.exporter.export([span])
+
+    def shutdown(self):
+        """Shutdown the exporter."""
+        self.exporter.shutdown()
+
+    def force_flush(self, timeout_millis=30000):
+        """Force flush the exporter."""
+        return self.exporter.force_flush(timeout_millis)
 
 
 # LogManager for directory structure management
@@ -20,7 +92,7 @@ class LogManager:
         "agents",      # LLM agent logs per iteration
         "tools",       # Tool call logs per iteration
         "resolves",    # Resolve and check logs per iteration
-        "debug",       # General debug logs
+        "imerge",      # Git-imerge operations per iteration
         "config"       # Configuration snapshots (if needed separately)
     }
 
@@ -106,6 +178,10 @@ class Logger:
 
     def __init__(self):
         self.log_manager = None
+        self.min_log_level = 'info'
+        self._configured = False  # Track if already configured
+        self._open_files = []  # Track open file handles for cleanup
+        self._processors = []  # Track span processors for shutdown
 
     def setup(
         self,
@@ -120,6 +196,9 @@ class Logger:
             log_root: Root directory for all log files
             merge_name: Name of this merge operation
         """
+        # Store min_log_level for later use in enable_file_logging
+        self.min_log_level = min_log_level
+
         # Set up LogManager if merge context provided
         additional_processors = []
         if log_root and merge_name:
@@ -130,6 +209,8 @@ class Logger:
         from logfire import ConsoleOptions
 
         # Configure logfire with both console and file logging
+        # Note: logfire.configure() can be called multiple times safely
+        # Later calls will reconfigure with new settings
         logfire.configure(
             console=ConsoleOptions(
                 min_log_level=min_log_level,
@@ -139,42 +220,110 @@ class Logger:
                 additional_processors if additional_processors else None
             )
         )
-        # Instrument pydantic-AI for spans
-        logfire.instrument_pydantic_ai()
 
-    def enable_file_logging(self, min_log_level: str = 'info'):
-        """Enable file logging for agent spans after iteration setup."""
+        # Instrument pydantic-AI for spans (only once)
+        if not self._configured:
+            logfire.instrument_pydantic_ai()
+            self._configured = True
+
+    def _create_category_exporter(self, category: str, min_log_level: str):
+        """Create a file exporter for a category.
+
+        Args:
+            category: Category name
+            min_log_level: Minimum log level
+
+        Returns:
+            Configured ShowParentsConsoleSpanExporter
+        """
+        from logfire._internal.exporters.console import (
+            ShowParentsConsoleSpanExporter,
+        )
+
+        log_path = self.log_manager.get_log_file(category, f"{category}.log")
+        f = open(log_path, 'w', encoding='utf-8')  # noqa: SIM115
+        self._open_files.append(f)  # Track for cleanup
+
+        return ShowParentsConsoleSpanExporter(
+            output=f,
+            colors='never',
+            include_timestamp=True,
+            include_tags=True,
+            verbose=True,
+            min_log_level=min_log_level
+        )
+
+    def close_files(self):
+        """Close all open log files and shutdown processors."""
+        for f in self._open_files:
+            f.flush()
+            f.close()
+        self._open_files.clear()
+
+        for p in self._processors:
+            p.shutdown()
+        self._processors.clear()
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
+        """Context manager exit - close files on ANY exit (normal or exception)."""
+        self.close_files()
+        return False  # Don't suppress exceptions
+
+    def enable_file_logging(self, min_log_level: str | None = None):
+        """Enable file logging with separate files per category.
+
+        Creates a filtered log file for each category that declares
+        itself via logger.for_category().
+
+        Args:
+            min_log_level: Override log level for file output
+                (defaults to console level)
+        """
         if self.log_manager:
-            from logfire._internal.exporters.console import (
-                ShowParentsConsoleSpanExporter,
-            )
-            from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+            from logfire import ConsoleOptions
 
-            # Create agent log path with correct directory structure
-            agent_log_path = self.log_manager.get_log_file(
-                "agents", "agent.log"
-            )
+            file_log_level = min_log_level or self.min_log_level
+            processors = []
 
-            # Configure file exporter for agent logs
-            file_exporter = ShowParentsConsoleSpanExporter(
-                output=open(agent_log_path, 'w', encoding='utf-8'),  # noqa: SIM115
-                colors='never',  # No ANSI codes in file
-                include_timestamp=True,
-                include_tags=True,
-                verbose=True,
-                min_log_level=min_log_level
-            )
+            # Create a filtered processor for each category
+            for category in self.log_manager.VALID_CATEGORIES:
+                exporter = self._create_category_exporter(
+                    category, file_log_level
+                )
+                processor = FilteringSpanProcessor(exporter, category)
+                processors.append(processor)
+                self._processors.append(processor)  # Track for cleanup
 
-            # Add the file processor to logfire
-            processor = SimpleSpanProcessor(file_exporter)
+            # Re-configure to preserve console settings
             logfire.configure(
-                additional_span_processors=[processor]
+                console=ConsoleOptions(
+                    min_log_level=self.min_log_level,
+                    verbose=True
+                ),
+                additional_span_processors=processors
             )
 
     def set_iteration(self, iteration: int):
-        """Set current iteration for log directory structure."""
+        """Set iteration and rotate log files automatically.
+
+        Closes previous iteration's files and opens new ones.
+
+        Args:
+            iteration: Current iteration number
+        """
         if self.log_manager:
+            # Close previous iteration's files
+            self.close_files()
+
+            # Update iteration number
             self.log_manager.set_iteration(iteration)
+
+            # Open new files for this iteration
+            self.enable_file_logging()
 
     def get_work_dir(
         self, category: str, iteration: int | None = None
@@ -191,6 +340,19 @@ class Logger:
         if not self.log_manager:
             raise RuntimeError("Call logger.setup() with log_root")
         return self.log_manager.get_log_file(category, filename, iteration)
+
+    def for_category(self, category: str) -> CategoryLogger:
+        """Get a logger that automatically tags with category.
+
+        Args:
+            category: Category name (must be in VALID_CATEGORIES)
+
+        Returns:
+            CategoryLogger that auto-tags all output
+        """
+        if self.log_manager:
+            self.log_manager._validate_category(category)
+        return CategoryLogger(category, self)
 
     # Forward all other methods to logfire
     def __getattr__(self, name):

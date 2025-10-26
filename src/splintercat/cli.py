@@ -8,6 +8,7 @@ from pydantic_settings import CliApp, CliSubCommand, get_subcommand
 from splintercat.command.merge import MergeCommand
 from splintercat.command.reset import ResetCommand
 from splintercat.core.config import State
+from splintercat.core.log import logger
 
 
 class CliState(State):
@@ -49,8 +50,10 @@ class CliState(State):
 
         # self IS State with all config loaded
         # Pass self to the command's run_workflow method
-        exit_code = asyncio.run(subcommand.run_workflow(self))
-        raise SystemExit(exit_code)
+        # Use logger as context manager to ensure files are closed on exit
+        with logger:
+            exit_code = asyncio.run(subcommand.run_workflow(self))
+            raise SystemExit(exit_code)
 
 
 def main():

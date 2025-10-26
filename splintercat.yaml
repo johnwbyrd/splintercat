@@ -59,23 +59,6 @@ config:
     # api_key: sk-or-v1-xxxxxxxxxxx
     base_url: http://localhost:8081/v1
 
-
-  # ==============================================================================
-  # STRATEGY - Merge strategy and recovery configuration
-  # ==============================================================================
-  strategy:
-    # Maximum number of recovery attempts before aborting
-    max_retries: 3
-
-    # Available strategies for Planner to choose from:
-    # - optimistic: resolve all conflicts, then test once (fastest, risky)
-    # - batch: resolve N conflicts, test, repeat (balanced)
-    # - per_conflict: resolve one, test, repeat (slowest, safest)
-    available: [optimistic, batch, per_conflict]
-
-    # Default batch size if using batch strategy
-    default_batch_size: 10
-
   # ==============================================================================
   # GLOBAL FLAGS
   # ==============================================================================
@@ -90,12 +73,12 @@ config:
 # - Environment variables can override any setting using double underscore delimiter:
 #   Examples:
 #     SPLINTERCAT__CONFIG__VERBOSE=true
-#     SPLINTERCAT__CONFIG__STRATEGY__MAX_RETRIES=10
+#     SPLINTERCAT__CONFIG__CHECK__MAX_RETRIES=10
 #
 # - Command-line args can override settings:
 #   Examples:
 #     --config.verbose=true
-#     --config.strategy.max_retries=10
+#     --config.check.max_retries=10
 #
 # - See doc/design.md for complete architecture and design details
 # - See doc/todo.md for implementation guide
