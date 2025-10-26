@@ -199,6 +199,7 @@ class Config(BaseConfig):
             otlp=self.logger.otlp,
             file=self.logger.file,
             logfire=self.logger.logfire,
+
         )
 
         # Clean up bootstrap logger from yaml_settings

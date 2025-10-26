@@ -6,6 +6,7 @@ include:
   - prompts.yaml
   - agents.yaml
   - tools.yaml
+  - sinks.yaml
 
 config:
   # Agent log directory for execution traces (platform-specific)

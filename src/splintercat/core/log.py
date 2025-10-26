@@ -56,9 +56,98 @@ class Sink(BaseConfig):
     """
 
     enabled: bool = Field(default=True, description="Enable this sink")
+    escape_special_characters: bool = Field(
+        default=False,
+        description="Escape newlines/tabs in output"
+    )
+    format_template: str | None = Field(
+        default=None,
+        description="Format template string (None for binary sinks)"
+    )
 
     # Runtime state (not serialized)
     _processor: Any = PrivateAttr(default=None)
+
+    @staticmethod
+    def _escape_special_chars(text: str) -> str:
+        """Escape special characters for single-line output."""
+        return (text
+            .replace('\\', '\\\\')
+            .replace('\n', '\\n')
+            .replace('\r', '\\r')
+            .replace('\t', '\\t')
+        )
+
+    @staticmethod
+    def _extract_span_data(span) -> dict:
+        """Extract common data from span for formatting."""
+        from datetime import UTC, datetime
+
+        attrs = span.attributes or {}
+        ts = datetime.fromtimestamp(span.start_time / 1e9, tz=UTC)
+        filepath = attrs.get("code.filepath", "")
+        lineno = attrs.get("code.lineno", "")
+
+        # Get numeric level and convert to name
+        level_num = attrs.get("logfire.level_num", 20)
+
+        # Map numeric levels to names (Python logging standard)
+        if level_num >= 50:
+            level_name = "CRITICAL"
+        elif level_num >= 40:
+            level_name = "ERROR"
+        elif level_num >= 30:
+            level_name = "WARNING"
+        elif level_num >= 20:
+            level_name = "INFO"
+        elif level_num >= 10:
+            level_name = "DEBUG"
+        else:
+            level_name = "TRACE"
+
+        # Calculate syslog priority
+        severity_map = {
+            "TRACE": 7,
+            "DEBUG": 7,
+            "INFO": 6,
+            "WARNING": 4,
+            "ERROR": 3,
+            "CRITICAL": 0,
+        }
+        severity = severity_map.get(level_name, 6)
+        priority = 8 * 1 + severity  # facility=user(1)
+
+        return {
+            'timestamp': ts,
+            'level': level_name,
+            'message': attrs.get("logfire.msg", span.name),
+            'filepath': filepath,
+            'lineno': lineno,
+            'location': f"{filepath}:{lineno}" if filepath else "",
+            'function': attrs.get("code.function", ""),
+            'priority': priority,
+        }
+
+    def _format_span(self, span) -> str:
+        """Generic span formatter using template."""
+        if not self.format_template:
+            # No template - use builtin JSON
+            import os
+            return span.to_json() + os.linesep
+
+        # Extract data
+        data = self._extract_span_data(span)
+
+        # Escape if needed
+        if self.escape_special_characters:
+            data['message'] = self._escape_special_chars(data['message'])
+
+        # Apply template
+        try:
+            return self.format_template.format(**data) + '\n'
+        except KeyError as e:
+            # Template references unknown field
+            return f"ERROR: Invalid template field {e}\n"
 
     @abstractmethod
     def create_processor(self, log_root: Path, merge_name: str):
@@ -176,8 +265,12 @@ class FileSink(Sink):
         # ruff: noqa: SIM115
         self._file = open(log_path, "a", buffering=1, encoding="utf-8")  # noqa: SIM115
 
-        # Use ConsoleSpanExporter writing to file
-        exporter = ConsoleSpanExporter(out=self._file)
+        # Use generic formatter from base Sink class
+        # Use ConsoleSpanExporter with custom formatter
+        exporter = ConsoleSpanExporter(
+            out=self._file,
+            formatter=self._format_span
+        )
         return BatchSpanProcessor(exporter)
 
     def close(self):

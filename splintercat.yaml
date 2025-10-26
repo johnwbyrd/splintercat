@@ -74,7 +74,11 @@ config:
     file:
       enabled: true
       path: "{log_root}/{merge_name}/splintercat.log"
-      min_level: debug
+      min_level: trace
+      # Default format template from sinks.yaml is used if not specified
+      # Uncomment to customize:
+      # format_template: "{timestamp:%Y-%m-%d %H:%M:%S.%f} [{level}] {location} {message}"
+      # escape_special_characters: false  # Set to true to escape \n, \r, \t in messages
 
     # OTLP telemetry export (SigNoz, Jaeger, etc.)
     otlp:

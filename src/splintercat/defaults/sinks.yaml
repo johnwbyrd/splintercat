@@ -1,0 +1,62 @@
+# Default sink configurations
+# Users can override these in their splintercat.yaml
+
+config:
+  logger:
+    # Console output sink
+    console:
+      enabled: true
+      escape_special_characters: false
+      format_template: "{timestamp:%H:%M:%S.%f} [{level}] {message}"
+      min_level: info
+      verbose: true
+      colors: auto
+
+    # File output sink
+    file:
+      enabled: false
+      escape_special_characters: false
+      format_template: "{timestamp:%Y-%m-%d %H:%M:%S.%f} [{level}] {location} {message}"
+      path: "{log_root}/{merge_name}/splintercat.log"
+      min_level: debug
+
+    # OTLP telemetry export (SigNoz, Jaeger, etc.)
+    otlp:
+      enabled: false
+      escape_special_characters: false
+      format_template: null
+      endpoint: http://localhost:4317
+      insecure: true
+
+    # Logfire.dev cloud logging
+    logfire:
+      enabled: false
+      escape_special_characters: false
+      format_template: null
+
+# Example format templates for common use cases:
+#
+# Human-readable text:
+#   format_template: "{timestamp:%Y-%m-%d %H:%M:%S.%f} [{level}] {location} {message}"
+#
+# Logfmt (key=value pairs):
+#   format_template: "time={timestamp:%Y-%m-%dT%H:%M:%S%z} level={level} file={filepath} line={lineno} msg=\"{message}\""
+#   escape_special_characters: true
+#
+# Common Log Format (Apache/Nginx):
+#   format_template: "- - - [{timestamp:%d/%b/%Y:%H:%M:%S %z}] \"{level} {location}\" - - \"{message}\""
+#   escape_special_characters: true
+#
+# Syslog RFC 5424:
+#   format_template: "<{priority}>1 {timestamp:%Y-%m-%dT%H:%M:%S%z} - splintercat - - - {message}"
+#   escape_special_characters: true
+#
+# Available template variables:
+#   {timestamp} - datetime object
+#   {level} - log level (TRACE, DEBUG, INFO, WARN, ERROR)
+#   {message} - log message
+#   {filepath} - source file path
+#   {lineno} - source line number
+#   {location} - filepath:lineno combined
+#   {function} - function name
+#   {priority} - syslog priority (for syslog format)
