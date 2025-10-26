@@ -28,6 +28,11 @@ class ResolveConflicts(BaseNode[State]):
         Returns:
             Check: Always run checks after resolving one conflict
         """
+        # Increment iteration (new resolve-check cycle)
+        ctx.state.runtime.merge.iteration += 1
+        logger.set_iteration(ctx.state.runtime.merge.iteration)
+        logger.enable_file_logging(ctx.state.config.log_level)
+
         imerge = ctx.state.runtime.merge.current_imerge
 
         if not imerge:

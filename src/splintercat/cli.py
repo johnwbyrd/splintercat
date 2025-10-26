@@ -45,25 +45,7 @@ class CliState(State):
             CliApp.run(CliState, cli_args=['--help'])
             sys.exit(1)
 
-        # Setup logging with file output for this command
-        from pathlib import Path
-
-        from splintercat.core.log import logger
-
-        # Get command name (merge, reset, etc.)
-        command_name = (
-            subcommand.__class__.__name__.replace('Command', '').lower()
-        )
-
-        # Extract project name from target_workdir for log organization
-        project_name = Path(self.config.git.target_workdir).name
-
-        logger.setup(
-            self.config.log_level,
-            agent_log_dir=Path(self.config.agent_log_dir),
-            command=command_name,
-            project_name=project_name
-        )
+        # Logging is now handled by LogManager in workflow nodes
 
         # self IS State with all config loaded
         # Pass self to the command's run_workflow method

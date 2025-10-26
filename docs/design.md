@@ -48,6 +48,36 @@ Once all conflicts are resolved and tests pass, git-imerge simplifies the hundre
 
 ## Architecture
 
+### Logging Directory Structure
+
+Splintercat uses a structured logging system organized by individual merge operations:
+
+```
+{log_root}/{merge_name}/default/
+├── state/                           # Persistent state files (workflow.yaml, config.yaml)
+│   ├── workflow.yaml                # Pydantic AI graph state
+│   └── config.yaml                  # Config snapshot
+├── agents/                          # Per-iteration agent logs
+│   ├── 001/                         # Iteration 1
+│   │   └── agent.log
+│   └── 002/                         # Iteration 2
+│       └── agent.log
+├── tools/                           # Per-iteration tool calls
+│   ├── 001/
+│   │   └── calls.log
+│   └── 002/
+│       └── calls.log
+└── resolves/                        # Per-iteration resolve/check
+    ├── 001/
+    │   ├── resolve.log
+    │   └── check.log
+    └── 002/
+        ├── resolve.log
+        └── check.log
+```
+
+Where `{log_root}` is `~/.local/state/` (platform-specific user state dir). Each merge operation gets its own directory directly under the log root, allowing clean separation between different merge sessions. The `LogManager` class provides type-safe access to log files, ensuring consistent directory creation and preventing typos in category names. Iteration numbers track resolve-check cycles within each merge.
+
 ### One LLM, One Job
 
 **Resolver** (single model):

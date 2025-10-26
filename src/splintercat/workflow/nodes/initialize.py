@@ -29,6 +29,19 @@ class Initialize(BaseNode[State]):
         target_branch = ctx.state.config.git.target_branch
         workdir = ctx.state.config.git.target_workdir
 
+        # Get merge name for logging directory structure
+        merge_name = ctx.state.config.git.imerge_name
+
+        # Setup logging and log directory management
+        logger.setup(
+            min_log_level=ctx.state.config.log_level,
+            log_root=ctx.state.config.log_root,
+            merge_name=merge_name
+        )
+
+        # Store reference to log manager in state
+        ctx.state.runtime.merge.log_manager = logger.log_manager
+
         # Initialize IMerge wrapper
         imerge = IMerge(
             workdir=workdir,

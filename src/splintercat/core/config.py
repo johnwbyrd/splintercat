@@ -165,10 +165,13 @@ class Config(BaseModel):
         default=False,
         description="Prompt before each command execution",
     )
-    agent_log_dir: Path = Field(
+    log_root: Path = Field(
+        default_factory=(
+            lambda: Path(platformdirs.user_state_dir()) / "splintercat"
+        ),
         description=(
-            "Directory for storing agent execution logs "
-            "(supports {platformdirs.*}, {config.*}, etc. templates)"
+            "Root directory for all log files "
+            "(supports {platformdirs.*} templates)"
         ),
     )
 
@@ -209,6 +212,14 @@ class MergeState(BaseState):
     current_imerge: Any = Field(
         default=None,
         description="Active git-imerge object",
+    )
+    log_manager: Any = Field(
+        default=None,
+        description="Log manager instance",
+    )
+    iteration: int = Field(
+        default=0,
+        description="Current resolve-check iteration number",
     )
     status: str = Field(
         default="pending",
