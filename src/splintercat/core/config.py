@@ -15,6 +15,8 @@ from pydantic_settings import (
     SettingsConfigDict,
 )
 
+from splintercat.core.base import BaseConfig, BaseState
+from splintercat.core.log import Logger
 from splintercat.core.yaml_settings import YamlWithIncludesSettingsSource
 
 # ============================================================
@@ -28,30 +30,6 @@ TEMPLATE_NAMESPACE = {
     'platformdirs': platformdirs,
     'Path': Path,
 }
-
-# ============================================================
-# BASE CLASSES (semantic markers for readers)
-# ============================================================
-
-class BaseConfig(BaseModel):
-    """Base class for all configuration sections.
-
-    This is intentionally empty - it serves as a semantic marker
-    to clearly indicate that a model represents configuration
-    (loaded from YAML/env/CLI) rather than runtime state.
-    """
-    pass
-
-
-class BaseState(BaseModel):
-    """Base class for all runtime state sections.
-
-    This is intentionally empty - it serves as a semantic marker
-    to clearly indicate that a model represents runtime state
-    (mutated during workflow execution) rather than configuration.
-    """
-    pass
-
 
 # ============================================================
 # CONFIG MODELS (loaded from YAML/env/CLI)
@@ -136,13 +114,16 @@ class LLMConfig(BaseConfig):
 
 
 
-class Config(BaseModel):
+class Config(BaseConfig):
     """Application configuration loaded from YAML/env/CLI.
 
     This groups all configuration into logical sections.
-    Note: Config itself doesn't inherit from BaseConfig
-    because it's the container, not a section.
+    Inherits from BaseConfig to enable automatic cleanup cascade.
     """
+    logger: Logger = Field(
+        default=None,
+        description="Logger configuration and runtime instance"
+    )
     git: GitConfig = Field(
         description="Git repository and merge settings"
     )
@@ -195,6 +176,51 @@ class Config(BaseModel):
         default_factory=dict,
         description="Platform-specific tool command definitions",
     )
+
+    @model_validator(mode='after')
+    def _setup_logger(self) -> 'Config':
+        """Initialize global logger singleton after config loads.
+
+        This is called automatically after all config is loaded and
+        template substitution has occurred. It configures the global
+        logger singleton using the logger config from YAML.
+        """
+        from splintercat.core.log import Logger, setup_logger
+
+        # Create default logger config if not provided
+        if self.logger is None:
+            self.logger = Logger()
+
+        # Initialize global singleton with config from YAML
+        setup_logger(
+            log_root=self.log_root,
+            merge_name=self.git.imerge_name,
+            console=self.logger.console,
+            otlp=self.logger.otlp,
+            file=self.logger.file,
+            logfire=self.logger.logfire,
+        )
+
+        # Clean up bootstrap logger from yaml_settings
+        # Safe: bootstrap and global logger are separate instances
+        # with separate span processors
+        from splintercat.core.yaml_settings import _cleanup_bootstrap_logger
+        _cleanup_bootstrap_logger()
+
+        return self
+
+    def close(self):
+        """Close config and global logger singleton.
+
+        Overrides BaseCloseable.close() to also close the global logger.
+        """
+        # Close global logger singleton
+        from splintercat.core.log import logger
+        if logger is not None:
+            logger.close()
+
+        # Call parent close() to close other closeable children
+        super().close()
 
 
 # ============================================================

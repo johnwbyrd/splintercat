@@ -18,10 +18,7 @@ import sys
 from contextlib import contextmanager
 from io import TextIOBase
 
-from splintercat.core.log import logger as base_logger
-
-# Get category-specific logger for git-imerge operations
-logger = base_logger.for_category("imerge")
+from splintercat.core.log import logger
 
 _REAL_POPEN = subprocess.Popen
 _REAL_CHECK_CALL = subprocess.check_call

@@ -2,7 +2,7 @@
 
 from functools import wraps
 
-from splintercat.core.log import logger as base_logger
+from splintercat.core.log import logger
 from splintercat.tools.base import Tool
 from splintercat.tools.commands import list_allowed_commands, run_command
 from splintercat.tools.registry import ToolRegistry
@@ -12,9 +12,6 @@ from splintercat.tools.workspace import (
     submit_resolution,
     write_file,
 )
-
-# Get category-specific logger for tool operations
-tools_logger = base_logger.for_category("tools")
 
 
 def _log_tool_result(func):
@@ -27,7 +24,7 @@ def _log_tool_result(func):
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
         # Log the complete tool result at trace level
-        tools_logger.trace(f"Tool {func.__name__} returned:\n{result}")
+        logger.trace(f"Tool {func.__name__} returned:\n{result}")
         return result
     return wrapper
 

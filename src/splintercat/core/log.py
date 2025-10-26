@@ -1,363 +1,387 @@
-"""Unified logging and log directory management."""
+"""Simplified logger with composable output sinks."""
 
+from __future__ import annotations
+
+import contextlib
+from abc import abstractmethod
 from pathlib import Path
+from typing import Any
 
-import logfire
-from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor
-from opentelemetry.sdk.trace.export import SpanExporter
+from pydantic import Field, PrivateAttr
+
+from splintercat.core.base import BaseConfig
+
+# Private storage for the actual logger instance
+_current_logger: Logger | None = None
 
 
-# Category-specific logger wrapper
-class CategoryLogger:
-    """Logger wrapper that auto-tags all output with a category.
+# Proxy object that forwards all attribute access to the current logger
+class _LoggerProxy:
+    """Proxy that forwards method calls to _current_logger.
 
-    Forwards all logfire methods but automatically adds category tag.
+    If _current_logger is None (before setup), returns no-op functions.
+    If _current_logger exists, forwards all attribute access to it.
     """
-
-    def __init__(self, category: str, parent_logger):
-        """Initialize category logger.
-
-        Args:
-            category: Category name for tagging
-            parent_logger: Parent Logger instance to forward calls to
-        """
-        self.category = category
-        self.parent = parent_logger
-
     def __getattr__(self, name):
-        """Forward logfire methods with automatic category tagging."""
-        original_method = getattr(self.parent, name)
-
-        def wrapped(*args, **kwargs):
-            # Add category tag to existing tags
-            tags = kwargs.get('_tags', [])
-            kwargs['_tags'] = [*tags, f"category:{self.category}"]
-            return original_method(*args, **kwargs)
-
-        return wrapped
-
-
-# Filtering span processor for category routing
-class FilteringSpanProcessor(SpanProcessor):
-    """Span processor that filters spans by category tag.
-
-    Only exports spans tagged with the matching category.
-    """
-
-    def __init__(self, exporter: SpanExporter, category: str):
-        """Initialize filtering processor.
-
-        Args:
-            exporter: The exporter to send matching spans to
-            category: Export spans tagged with this category
-        """
-        self.exporter = exporter
-        self.category = category
-        self.category_tag = f"category:{category}"
-
-    def on_start(self, span, parent_context=None):
-        """Called when span starts - no filtering needed."""
-        pass
-
-    def on_end(self, span: ReadableSpan):
-        """Called when span ends - filter and export if matches."""
-        # Check if span has matching category tag
-        # Tags are stored in 'logfire.tags' attribute
-        if span.attributes:
-            tags = span.attributes.get('logfire.tags', ())
-            if isinstance(tags, (list, tuple)) and self.category_tag in tags:
-                self.exporter.export([span])
-
-    def shutdown(self):
-        """Shutdown the exporter."""
-        self.exporter.shutdown()
-
-    def force_flush(self, timeout_millis=30000):
-        """Force flush the exporter."""
-        return self.exporter.force_flush(timeout_millis)
-
-
-# LogManager for directory structure management
-class LogManager:
-    """Centralized log file and directory management.
-
-    Provides structured access to log files organized by category
-    and iteration number. Ensures consistent directory creation
-    and prevents typos in category names.
-    """
-
-    # Valid category names to prevent typos
-    VALID_CATEGORIES = {
-        "state",       # Persistent state files (workflow.yaml, config.yaml)
-        "agents",      # LLM agent logs per iteration
-        "tools",       # Tool call logs per iteration
-        "resolves",    # Resolve and check logs per iteration
-        "imerge",      # Git-imerge operations per iteration
-        "config"       # Configuration snapshots (if needed separately)
-    }
-
-    def __init__(self, log_root: Path, merge_name: str):
-        """Initialize log manager for a merge operation.
-
-        Args:
-            log_root: Root directory containing all splintercat logs
-            merge_name: Name of this merge operation (git-imerge name)
-        """
-        self.root = log_root / merge_name
-        self.current_iteration = 0
-
-    def set_iteration(self, iteration: int):
-        """Update current iteration (called by coordinator/workflow).
-
-        Args:
-            iteration: Current resolve-check cycle number
-        """
-        self.current_iteration = iteration
-
-    def _validate_category(self, category: str):
-        """Validate category name.
-
-        Args:
-            category: Category to validate
-
-        Raises:
-            ValueError: If category is invalid
-        """
-        if category not in self.VALID_CATEGORIES:
-            raise ValueError(
-                f"Invalid log category '{category}'. "
-                f"Valid categories: {', '.join(sorted(self.VALID_CATEGORIES))}"
-            )
-
-    def get_work_dir(
-        self, category: str, iteration: int | None = None
-    ) -> Path:
-        """Get/create work directory for any category.
-
-        Args:
-            category: Directory under default/ (e.g. 'state', 'agents')
-            iteration: Iteration number for subdir (e.g. 1 -> 001/)
-
-        Returns:
-            Path to category directory (iteration subdir if specified)
-        """
-        self._validate_category(category)
-
-        iter_num = iteration or self.current_iteration
-        category_dir = self.root / "default" / category
-        if iter_num > 0:  # Only create iteration subdir if > 0
-            category_dir = category_dir / f"{iter_num:03d}"
-        category_dir.mkdir(parents=True, exist_ok=True)
-        return category_dir
-
-    def get_log_file(
-        self, category: str, filename: str, iteration: int | None = None
-    ) -> Path:
-        """Get path to a log file, ensuring directory exists.
-
-        Args:
-            category: Category directory name
-            filename: Filename within category (e.g. 'agent.log')
-            iteration: Optional iteration for subdir
-
-        Returns:
-            Full path to log file (directory guaranteed to exist)
-        """
-        work_dir = self.get_work_dir(category, iteration)
-        return work_dir / filename
-
-
-# Unified Logger class combining logfire functionality and LogManager
-class Logger:
-    """
-    Unified logging interface with directory management.
-
-    Provides logfire-based logging methods plus structured
-    log file management.
-    """
-
-    def __init__(self):
-        self.log_manager = None
-        self.min_log_level = 'info'
-        self._configured = False  # Track if already configured
-        self._open_files = []  # Track open file handles for cleanup
-        self._processors = []  # Track span processors for shutdown
-
-    def setup(
-        self,
-        min_log_level: str = 'info',
-        log_root: Path | None = None,
-        merge_name: str | None = None
-    ):
-        """Configure logging and log directory management.
-
-        Args:
-            min_log_level: Minimum log level to display
-            log_root: Root directory for all log files
-            merge_name: Name of this merge operation
-        """
-        # Store min_log_level for later use in enable_file_logging
-        self.min_log_level = min_log_level
-
-        # Set up LogManager if merge context provided
-        additional_processors = []
-        if log_root and merge_name:
-            self.log_manager = LogManager(log_root, merge_name)
-            # File logging setup deferred - done when iteration starts
-            # Prevents creating files before iteration numbers set
-
-        from logfire import ConsoleOptions
-
-        # Configure logfire with both console and file logging
-        # Note: logfire.configure() can be called multiple times safely
-        # Later calls will reconfigure with new settings
-        logfire.configure(
-            console=ConsoleOptions(
-                min_log_level=min_log_level,
-                verbose=True  # Show full span details
-            ),
-            additional_span_processors=(
-                additional_processors if additional_processors else None
-            )
-        )
-
-        # Instrument pydantic-AI for spans (only once)
-        if not self._configured:
-            logfire.instrument_pydantic_ai()
-            self._configured = True
-
-    def _create_category_exporter(self, category: str, min_log_level: str):
-        """Create a file exporter for a category.
-
-        Args:
-            category: Category name
-            min_log_level: Minimum log level
-
-        Returns:
-            Configured ShowParentsConsoleSpanExporter
-        """
-        from logfire._internal.exporters.console import (
-            ShowParentsConsoleSpanExporter,
-        )
-
-        log_path = self.log_manager.get_log_file(category, f"{category}.log")
-        f = open(log_path, 'w', encoding='utf-8')  # noqa: SIM115
-        self._open_files.append(f)  # Track for cleanup
-
-        return ShowParentsConsoleSpanExporter(
-            output=f,
-            colors='never',
-            include_timestamp=True,
-            include_tags=True,
-            verbose=True,
-            min_log_level=min_log_level
-        )
-
-    def close_files(self):
-        """Close all open log files and shutdown processors."""
-        for f in self._open_files:
-            f.flush()
-            f.close()
-        self._open_files.clear()
-
-        for p in self._processors:
-            p.shutdown()
-        self._processors.clear()
+        if _current_logger is None:
+            # Return no-op function before logger is initialized
+            def _noop(*args, **kwargs):  # noqa: ARG001
+                pass
+            return _noop
+        return getattr(_current_logger, name)
 
     def __enter__(self):
-        """Context manager entry."""
-        return self
+        """Support context manager protocol for spans."""
+        if _current_logger is None:
+            return self
+        return _current_logger.__enter__()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):  # noqa: U100
-        """Context manager exit - close files on ANY exit (normal or exception)."""
-        self.close_files()
-        return False  # Don't suppress exceptions
+    def __exit__(self, *args):
+        """Support context manager protocol for spans."""
+        if _current_logger is None:
+            return False
+        return _current_logger.__exit__(*args)
 
-    def enable_file_logging(self, min_log_level: str | None = None):
-        """Enable file logging with separate files per category.
 
-        Creates a filtered log file for each category that declares
-        itself via logger.for_category().
+# Module-level logger - this is what gets imported everywhere
+logger = _LoggerProxy()
 
-        Args:
-            min_log_level: Override log level for file output
-                (defaults to console level)
-        """
-        if self.log_manager:
-            from logfire import ConsoleOptions
 
-            file_log_level = min_log_level or self.min_log_level
-            processors = []
+class Sink(BaseConfig):
+    """Base class for log output sinks.
 
-            # Create a filtered processor for each category
-            for category in self.log_manager.VALID_CATEGORIES:
-                exporter = self._create_category_exporter(
-                    category, file_log_level
-                )
-                processor = FilteringSpanProcessor(exporter, category)
-                processors.append(processor)
-                self._processors.append(processor)  # Track for cleanup
+    Each sink represents an independent output destination.
+    Inherits from BaseConfig → BaseCloseable, so close() is
+    automatically called during cleanup cascade.
+    """
 
-            # Re-configure to preserve console settings
-            logfire.configure(
-                console=ConsoleOptions(
-                    min_log_level=self.min_log_level,
-                    verbose=True
-                ),
-                additional_span_processors=processors
-            )
+    enabled: bool = Field(default=True, description="Enable this sink")
 
-    def set_iteration(self, iteration: int):
-        """Set iteration and rotate log files automatically.
+    # Runtime state (not serialized)
+    _processor: Any = PrivateAttr(default=None)
 
-        Closes previous iteration's files and opens new ones.
+    @abstractmethod
+    def create_processor(self, log_root: Path, merge_name: str):
+        """Create OpenTelemetry span processor for this sink.
 
         Args:
-            iteration: Current iteration number
-        """
-        if self.log_manager:
-            # Close previous iteration's files
-            self.close_files()
-
-            # Update iteration number
-            self.log_manager.set_iteration(iteration)
-
-            # Open new files for this iteration
-            self.enable_file_logging()
-
-    def get_work_dir(
-        self, category: str, iteration: int | None = None
-    ) -> Path:
-        """Get work directory for category."""
-        if not self.log_manager:
-            raise RuntimeError("LogManager not set - call setup() first")
-        return self.log_manager.get_work_dir(category, iteration)
-
-    def get_log_file(
-        self, category: str, filename: str, iteration: int | None = None
-    ) -> Path:
-        """Get log file path for category and filename."""
-        if not self.log_manager:
-            raise RuntimeError("Call logger.setup() with log_root")
-        return self.log_manager.get_log_file(category, filename, iteration)
-
-    def for_category(self, category: str) -> CategoryLogger:
-        """Get a logger that automatically tags with category.
-
-        Args:
-            category: Category name (must be in VALID_CATEGORIES)
+            log_root: Root directory for log files
+            merge_name: Current merge operation name
 
         Returns:
-            CategoryLogger that auto-tags all output
+            SpanProcessor instance or None if not applicable
         """
-        if self.log_manager:
-            self.log_manager._validate_category(category)
-        return CategoryLogger(category, self)
+        pass
 
-    # Forward all other methods to logfire
+    def close(self):
+        """Close this sink - shutdown processor.
+
+        Called automatically via BaseCloseable cleanup cascade.
+        """
+        if self._processor:
+            with contextlib.suppress(Exception):
+                self._processor.shutdown()
+
+
+class ConsoleSink(Sink):
+    """Console output sink (stdout/stderr)."""
+
+    min_level: str = Field(
+        default="info",
+        description="Minimum log level: trace, debug, info, warn, error"
+    )
+    verbose: bool = Field(
+        default=True,
+        description="Show full span details"
+    )
+    colors: str = Field(
+        default="auto",
+        description="Color mode: auto, always, never"
+    )
+
+    def create_processor(self, log_root: Path, merge_name: str):
+        """Console configured via logfire.configure()."""
+        return None
+
+
+class OTLPSink(Sink):
+    """OTLP telemetry export sink (SigNoz, Jaeger, etc.)."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable OTLP export"
+    )
+    endpoint: str = Field(
+        default="http://localhost:4317",
+        description="OTLP gRPC endpoint"
+    )
+    insecure: bool = Field(
+        default=True,
+        description="Use insecure connection (no TLS)"
+    )
+    headers: dict[str, str] = Field(
+        default_factory=dict,
+        description="Optional headers for authentication"
+    )
+
+    def create_processor(self, log_root: Path, merge_name: str):
+        """Create OTLP span exporter and processor."""
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+            OTLPSpanExporter,
+        )
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+        exporter = OTLPSpanExporter(
+            endpoint=self.endpoint,
+            insecure=self.insecure,
+            headers=self.headers if self.headers else None,
+        )
+        return BatchSpanProcessor(exporter)
+
+
+class FileSink(Sink):
+    """File output sink."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable file logging"
+    )
+    path: str = Field(
+        default="{log_root}/{merge_name}/splintercat.log",
+        description="Log file path template"
+    )
+    min_level: str = Field(
+        default="debug",
+        description="Minimum log level for file output"
+    )
+
+    # Runtime state
+    _file: Any = PrivateAttr(default=None)
+
+    def create_processor(self, log_root: Path, merge_name: str):
+        """Create file span exporter and processor."""
+        from opentelemetry.sdk.trace.export import (
+            BatchSpanProcessor,
+            ConsoleSpanExporter,
+        )
+
+        # Expand path template
+        log_path = Path(
+            self.path.format(log_root=log_root, merge_name=merge_name)
+        )
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Open file with line buffering (crash-safe)
+        # Note: File stays open for the lifetime of the sink
+        # ruff: noqa: SIM115
+        self._file = open(log_path, "a", buffering=1, encoding="utf-8")  # noqa: SIM115
+
+        # Use ConsoleSpanExporter writing to file
+        exporter = ConsoleSpanExporter(out=self._file)
+        return BatchSpanProcessor(exporter)
+
+    def close(self):
+        """Close processor first, then close file.
+
+        The processor needs to flush remaining spans to the file
+        before we close it.
+        """
+        # Close processor first (flushes remaining spans)
+        super().close()
+
+        # Then close the file
+        if self._file and not self._file.closed:
+            try:
+                self._file.flush()
+                self._file.close()
+            except Exception:
+                pass
+
+
+class LogfireSink(Sink):
+    """Logfire.dev cloud sink."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Send telemetry to logfire.dev cloud"
+    )
+    token: str | None = Field(
+        default=None,
+        description="API token (or use LOGFIRE_TOKEN env var)"
+    )
+
+    def create_processor(self, log_root: Path, merge_name: str):
+        """Logfire configured globally via logfire.configure()."""
+        return None
+
+
+class Logger(BaseConfig):
+    """Logger with composable output sinks.
+
+    Because Logger inherits from BaseConfig → BaseCloseable,
+    calling logger.close() automatically walks all sinks and
+    calls their close() methods via the Closeable protocol.
+
+    No manual cleanup needed - Python's context manager protocol
+    ensures all resources are freed even on exceptions.
+    """
+
+    console: ConsoleSink = Field(
+        default_factory=ConsoleSink,
+        description="Console output configuration"
+    )
+    otlp: OTLPSink = Field(
+        default_factory=OTLPSink,
+        description="OTLP telemetry export configuration"
+    )
+    file: FileSink = Field(
+        default_factory=FileSink,
+        description="File logging configuration"
+    )
+    logfire: LogfireSink = Field(
+        default_factory=LogfireSink,
+        description="Logfire.dev cloud configuration"
+    )
+
+    def setup(self, log_root: Path, merge_name: str):
+        """Initialize all enabled sinks.
+
+        Called automatically by Config._setup_logger() validator
+        after config is loaded from YAML.
+
+        Args:
+            log_root: Root directory for log files
+            merge_name: Name of current merge operation
+        """
+        # Create processors for all enabled sinks
+        for sink in [self.console, self.otlp, self.file, self.logfire]:
+            if sink.enabled:
+                sink._processor = sink.create_processor(log_root, merge_name)
+
+        # Collect non-None processors
+        processors = [
+            sink._processor
+            for sink in [self.otlp, self.file]
+            if sink.enabled and sink._processor
+        ]
+
+        # Configure console
+        import logfire
+        from logfire import ConsoleOptions
+
+        console_config = (
+            ConsoleOptions(
+                min_log_level=self.console.min_level,
+                verbose=self.console.verbose,
+                colors=self.console.colors,
+                include_timestamps=True,
+            )
+            if self.console.enabled
+            else False
+        )
+
+        # Configure logfire with all sinks
+        logfire.configure(
+            send_to_logfire=self.logfire.enabled,
+            token=self.logfire.token if self.logfire.enabled else None,
+            console=console_config,
+            additional_span_processors=processors if processors else None,
+        )
+
+        # Instrument pydantic-ai
+        logfire.instrument_pydantic_ai()
+
+    # Logging methods - delegate to logfire
+
+    def info(self, msg: str, **kwargs):
+        """Log info message."""
+        import logfire
+        logfire.info(msg, **kwargs)
+
+    def debug(self, msg: str, **kwargs):
+        """Log debug message."""
+        import logfire
+        logfire.debug(msg, **kwargs)
+
+    def trace(self, msg: str, **kwargs):
+        """Log trace message."""
+        import logfire
+        logfire.trace(msg, **kwargs)
+
+    def warn(self, msg: str, **kwargs):
+        """Log warning message."""
+        import logfire
+        logfire.warn(msg, **kwargs)
+
+    def warning(self, msg: str, **kwargs):
+        """Alias for warn()."""
+        import logfire
+        logfire.warn(msg, **kwargs)
+
+    def error(self, msg: str, **kwargs):
+        """Log error message."""
+        import logfire
+        logfire.error(msg, **kwargs)
+
+    def span(self, msg: str, **kwargs):
+        """Create a span context manager for tracing operations.
+
+        Usage:
+            with logger.span("operation_name"):
+                # work here
+        """
+        import logfire
+        return logfire.span(msg, **kwargs)
+
+    def log(self, level: str, msg: str, **kwargs):
+        """Log at specified level."""
+        import logfire
+        logfire.log(level, msg, **kwargs)
+
     def __getattr__(self, name):
+        """Forward any other logfire methods."""
+        import logfire
         return getattr(logfire, name)
 
 
-# Create the unified logger instance
-logger = Logger()
+# Module-level singleton access functions
+
+
+def setup_logger(
+    log_root: Path,
+    merge_name: str,
+    console: ConsoleSink | None = None,
+    otlp: OTLPSink | None = None,
+    file: FileSink | None = None,
+    logfire: LogfireSink | None = None,
+) -> Logger:
+    """Initialize the global logger singleton.
+
+    Called automatically by Config when loading from YAML.
+    Can also be called manually for testing or standalone use.
+
+    Args:
+        log_root: Root directory for log files
+        merge_name: Name of current merge operation
+        console: Console sink config (or None for defaults)
+        otlp: OTLP sink config (or None for defaults)
+        file: File sink config (or None for defaults)
+        logfire: Logfire sink config (or None for defaults)
+
+    Returns:
+        Logger: The initialized global logger instance
+    """
+    global _current_logger
+
+    # Create logger with provided or default sinks
+    _current_logger = Logger(
+        console=console or ConsoleSink(),
+        otlp=otlp or OTLPSink(),
+        file=file or FileSink(),
+        logfire=logfire or LogfireSink(),
+    )
+
+    # Setup all sinks
+    _current_logger.setup(log_root, merge_name)
+
+    return _current_logger

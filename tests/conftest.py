@@ -1,10 +1,12 @@
 """Pytest configuration and fixtures for splintercat tests."""
 
 import sys
+import tempfile
+from pathlib import Path
 
 import pytest
 
-from splintercat.core.log import logger
+from splintercat.core.log import ConsoleSink, setup_logger
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -14,7 +16,13 @@ def configure_logging():
     This enables debug output during test runs without requiring
     authentication or sending logs to logfire.dev.
     """
-    logger.setup(min_log_level='debug')
+    # Setup global logger for tests with console-only output
+    test_log_root = Path(tempfile.gettempdir()) / "splintercat-tests"
+    setup_logger(
+        log_root=test_log_root,
+        merge_name="test",
+        console=ConsoleSink(min_level="debug"),
+    )
 
 
 @pytest.fixture(scope="session")

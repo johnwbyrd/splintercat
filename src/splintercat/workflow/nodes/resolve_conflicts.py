@@ -30,7 +30,6 @@ class ResolveConflicts(BaseNode[State]):
         """
         # Increment iteration (new resolve-check cycle)
         ctx.state.runtime.merge.iteration += 1
-        logger.set_iteration(ctx.state.runtime.merge.iteration)
 
         imerge = ctx.state.runtime.merge.current_imerge
 

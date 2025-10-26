@@ -9,7 +9,32 @@ import yaml
 from platformdirs import user_config_dir
 from pydantic_settings import BaseSettings, YamlConfigSettingsSource
 
-from splintercat.core.log import logger
+# Bootstrap logger - created lazily to avoid circular import
+_bootstrap_logger = None
+
+
+def _get_bootstrap_logger():
+    """Get or create bootstrap logger for config loading.
+
+    Created lazily to avoid circular import at module load time.
+    """
+    global _bootstrap_logger
+    if _bootstrap_logger is None:
+        from splintercat.core.log import Logger
+        _bootstrap_logger = Logger()
+        _bootstrap_logger.setup(log_root=Path.home(), merge_name="bootstrap")
+    return _bootstrap_logger
+
+
+def _cleanup_bootstrap_logger():
+    """Clean up bootstrap logger after config loads.
+
+    Called after Config initializes the global logger singleton.
+    """
+    global _bootstrap_logger
+    if _bootstrap_logger:
+        _bootstrap_logger.close()
+        _bootstrap_logger = None
 
 
 class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
@@ -36,9 +61,6 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
             yaml_file: Optional override for user config file path
         """
         import sys
-        # This configuration will be incorrect but let's do it anyway
-        # because logfire will complain otherwise
-        logger.setup()
 
         # Parse --include from CLI before pydantic processes it
         includes = []
@@ -108,14 +130,14 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
         # Load and merge all files that exist
         for file_path in files_to_load:
             if file_path.is_file():
-                with logger.span(
+                with _get_bootstrap_logger().span(
                     "Configuration loading",
                     file=str(file_path),
                 ):
                     data = self._load_file_recursive(file_path, set())
                     result = self._deep_merge(result, data)
             else:
-                logger.debug(
+                _get_bootstrap_logger().debug(
                     "Configuration file not found (skipping)",
                     file=str(file_path),
                 )
@@ -152,7 +174,7 @@ class YamlWithIncludesSettingsSource(YamlConfigSettingsSource):
 
             for inc in includes:
                 inc_path = self._resolve_path(inc, filepath)
-                with logger.span(
+                with _get_bootstrap_logger().span(
                     f"Including {inc_path.name}",
                     included_from=str(filepath),
                     include_file=str(inc_path),

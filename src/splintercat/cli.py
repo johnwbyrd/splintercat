@@ -50,7 +50,7 @@ class CliState(State):
 
         # self IS State with all config loaded
         # Pass self to the command's run_workflow method
-        # Use logger as context manager to ensure files are closed on exit
+        # Use logger context manager to ensure files close on exit
         with logger:
             exit_code = asyncio.run(subcommand.run_workflow(self))
             raise SystemExit(exit_code)
