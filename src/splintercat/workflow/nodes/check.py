@@ -50,7 +50,7 @@ class Check(BaseNode[State]):
                 ctx.state.runtime.merge.retry_count += 1
 
                 # Check if max retries exceeded
-                max_retries = ctx.state.config.strategy.max_retries
+                max_retries = ctx.state.config.check.max_retries
                 if ctx.state.runtime.merge.retry_count > max_retries:
                     logger.error(
                         f"Max retries ({max_retries}) exceeded. Aborting."
@@ -91,7 +91,7 @@ class Check(BaseNode[State]):
 
         # Route based on whether conflicts remain
         if ctx.state.runtime.merge.conflicts_remaining:
-            logger.info("All checks passed. Resolving next batch.")
+            logger.info("All checks passed. Resolving next conflict.")
             from splintercat.workflow.nodes.resolve_conflicts import (
                 ResolveConflicts,
             )

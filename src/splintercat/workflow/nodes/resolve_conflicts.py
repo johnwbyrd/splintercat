@@ -16,21 +16,19 @@ from splintercat.model.resolver import resolve_workspace
 
 @dataclass
 class ResolveConflicts(BaseNode[State]):
-    """Resolve conflicts using resolver model and strategy."""
+    """Resolve conflicts using resolver model."""
 
     async def run(
         self, ctx: GraphRunContext[State]
     ) -> "Check":
-        """Resolve conflicts in current batch using resolver model.
+        """Resolve exactly one conflict using resolver model.
 
-        Uses the active strategy to determine batch size and
-        when to check. Retries use error context from last failed check.
+        Uses error context from last failed check if retrying.
 
         Returns:
-            Check: Next node to run checks after resolving batch
+            Check: Always run checks after resolving one conflict
         """
         imerge = ctx.state.runtime.merge.current_imerge
-        strategy = ctx.state.runtime.merge.strategy
 
         if not imerge:
             raise ValueError("No active imerge instance")
@@ -46,20 +44,15 @@ class ResolveConflicts(BaseNode[State]):
                     f"See log: {last_check.log_file}"
                 )
 
-        # Track conflicts resolved in this batch
-        conflicts_resolved_this_batch = 0
+        # Get current conflict
+        conflict_pair = imerge.get_current_conflict()
 
-        # Resolve conflicts until strategy says to check
-        while True:
-            # Get current conflict
-            conflict_pair = imerge.get_current_conflict()
-
-            if conflict_pair is None:
-                # No more conflicts
-                logger.info("No more conflicts to resolve")
-                ctx.state.runtime.merge.conflicts_remaining = False
-                break
-
+        if conflict_pair is None:
+            # No more conflicts
+            logger.info("No more conflicts to resolve")
+            ctx.state.runtime.merge.conflicts_remaining = False
+        else:
+            # Resolve exactly one conflict
             i1, i2 = conflict_pair
             logger.info(f"Resolving conflict pair ({i1}, {i2})")
 
@@ -68,7 +61,7 @@ class ResolveConflicts(BaseNode[State]):
                 imerge, i1, i2, config=ctx.state.config
             )
 
-            # Resolve all conflicts
+            # Resolve all conflicts in this pair
             # LLM has access to all files via commands
             await resolve_workspace(
                 workspace,
@@ -85,24 +78,11 @@ class ResolveConflicts(BaseNode[State]):
             # Continue imerge after resolving all files in this pair
             imerge.continue_after_resolution()
 
-            # Increment counter
-            conflicts_resolved_this_batch += 1
-
-            # Check if strategy says to run checks now
-            if strategy.should_check_now(conflicts_resolved_this_batch):
-                logger.info(
-                    f"Strategy says check now after "
-                    f"{conflicts_resolved_this_batch} conflicts"
-                )
-                # Check if more conflicts remain
-                next_conflict = imerge.get_current_conflict()
-                ctx.state.runtime.merge.conflicts_remaining = (
-                    next_conflict is not None
-                )
-                break
-
-        # Reset batch counter for next iteration
-        strategy.reset_batch()
+            # Check if more conflicts remain
+            next_conflict = imerge.get_current_conflict()
+            ctx.state.runtime.merge.conflicts_remaining = (
+                next_conflict is not None
+            )
 
         # Return Check node
         from splintercat.workflow.nodes.check import Check

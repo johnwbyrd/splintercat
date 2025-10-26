@@ -53,32 +53,16 @@ class Initialize(BaseNode[State]):
             )
             imerge.start_merge(source_ref, target_branch)
 
-        # Create strategy based on config
-        strategy_name = ctx.state.config.strategy.name
-        if strategy_name == "optimistic":
-            from splintercat.strategy.optimistic import OptimisticStrategy
-            strategy = OptimisticStrategy()
-        elif strategy_name == "batch":
-            from splintercat.strategy.batch import BatchStrategy
-            batch_size = ctx.state.config.strategy.batch_size
-            strategy = BatchStrategy(batch_size)
-        elif strategy_name == "per_conflict":
-            from splintercat.strategy.per_conflict import PerConflictStrategy
-            strategy = PerConflictStrategy()
-        else:
-            raise ValueError(f"Unknown strategy: {strategy_name}")
-
         # Update workflow runtime state
         ctx.state.runtime.merge.current_imerge = imerge
         ctx.state.runtime.merge.status = "initialized"
         ctx.state.runtime.merge.conflicts_remaining = True
-        ctx.state.runtime.merge.strategy = strategy
 
         # Log successful initialization
         action = "Resumed" if is_resuming else "Initialized"
         logger.info(
             f"{action} git-imerge merge of {source_ref} into "
-            f"{target_branch} with {strategy_name} strategy"
+            f"{target_branch}"
         )
 
         # Return next node

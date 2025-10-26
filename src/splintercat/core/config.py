@@ -101,6 +101,10 @@ class CheckConfig(BaseConfig):
         default=3600,
         description="Timeout for checks in seconds (1 hour = 3600)",
     )
+    max_retries: int = Field(
+        default=3,
+        description="Maximum retry attempts when checks fail",
+    )
 
 
 class LLMConfig(BaseConfig):
@@ -129,24 +133,7 @@ class LLMConfig(BaseConfig):
     )
 
 
-class StrategyConfig(BaseConfig):
-    """Merge strategy configuration."""
 
-    name: str = Field(
-        default="batch",
-        description=(
-            "Strategy: optimistic (resolve all, check once), "
-            "batch (resolve N, check), per_conflict (check after each)"
-        ),
-    )
-    batch_size: int = Field(
-        default=10,
-        description="Batch size for 'batch' strategy",
-    )
-    max_retries: int = Field(
-        default=3,
-        description="Maximum retries per batch before aborting",
-    )
 
 
 class Config(BaseModel):
@@ -165,9 +152,7 @@ class Config(BaseModel):
     llm: LLMConfig = Field(
         description="LLM provider and model settings"
     )
-    strategy: StrategyConfig = Field(
-        description="Merge strategy and recovery settings"
-    )
+
     log_level: str = Field(
         default="info",
         alias="log-level",
@@ -253,10 +238,7 @@ class MergeState(BaseState):
         default=0,
         description="Number of retries for current batch",
     )
-    strategy: Any = Field(
-        default=None,
-        description="Active strategy object (OptimisticStrategy, etc.)",
-    )
+
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

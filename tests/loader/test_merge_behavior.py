@@ -16,9 +16,7 @@ def fixtures_dir():
 
 def test_deep_merge_preserves_non_overlapping(fixtures_dir):
     """Deep merge preserves values that don't conflict."""
-    # minimal.yaml has full config
-    # override_strategy.yaml only has strategy and one git command
-    # Result should have both
+    # Test with check config instead since strategy is removed
 
     from splintercat.core.yaml_settings import YamlWithIncludesSettingsSource
 
@@ -28,14 +26,14 @@ def test_deep_merge_preserves_non_overlapping(fixtures_dir):
     base = {
         "config": {
             "git": {"source_ref": "base", "target_workdir": "/tmp"},
-            "strategy": {"max_retries": 3, "available": ["optimistic"]},
+            "check": {"timeout": 3600, "max_retries": 3},
         }
     }
 
     override = {
         "config": {
             "git": {"source_ref": "override"},  # Override this
-            "strategy": {"max_retries": 99},  # Override this
+            "check": {"max_retries": 99},  # Override this
         }
     }
 
@@ -43,11 +41,11 @@ def test_deep_merge_preserves_non_overlapping(fixtures_dir):
 
     # Overridden values
     assert result["config"]["git"]["source_ref"] == "override"
-    assert result["config"]["strategy"]["max_retries"] == 99
+    assert result["config"]["check"]["max_retries"] == 99
 
     # Preserved values
     assert result["config"]["git"]["target_workdir"] == "/tmp"
-    assert result["config"]["strategy"]["available"] == ["optimistic"]
+    assert result["config"]["check"]["timeout"] == 3600
 
 
 def test_deep_merge_adds_new_keys(fixtures_dir):
