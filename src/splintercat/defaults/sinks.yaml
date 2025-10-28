@@ -8,7 +8,6 @@ config:
       enabled: true
       escape_special_characters: false
       format_template: "{timestamp:%H:%M:%S.%f} [{level}] {message}"
-      min_level: info
       verbose: true
       colors: auto
 
@@ -18,7 +17,6 @@ config:
       escape_special_characters: false
       format_template: "{timestamp:%Y-%m-%d %H:%M:%S.%f} [{level}] {location} {message}"
       path: "{log_root}/{merge_name}/splintercat.log"
-      min_level: debug
 
     # OTLP telemetry export (SigNoz, Jaeger, etc.)
     otlp:

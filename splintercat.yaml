@@ -63,10 +63,13 @@ config:
   # LOGGER - Logging output configuration
   # ==============================================================================
   logger:
+    # Default log level for all sinks (trace, debug, info, warn, error, fatal)
+    # Individual sinks can override by setting their own level
+    level: trace
+
     # Console output (stdout/stderr)
     console:
       enabled: true
-      min_level: info  # trace, debug, info, warn, error
       verbose: true
       colors: auto  # auto, always, never
 
@@ -74,7 +77,6 @@ config:
     file:
       enabled: true
       path: "{log_root}/{merge_name}/splintercat.log"
-      min_level: trace
       # Default format template from sinks.yaml is used if not specified
       # Uncomment to customize:
       # format_template: "{timestamp:%Y-%m-%d %H:%M:%S.%f} [{level}] {location} {message}"

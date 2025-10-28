@@ -134,14 +134,6 @@ class Config(BaseConfig):
         description="LLM provider and model settings"
     )
 
-    log_level: str = Field(
-        default="info",
-        alias="log-level",
-        description=(
-            "Console log level: 'trace', 'debug', 'info', "
-            "'warn', 'error', 'fatal'"
-        ),
-    )
     interactive: bool = Field(
         default=False,
         description="Prompt before each command execution",

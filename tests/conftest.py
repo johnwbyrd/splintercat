@@ -21,7 +21,7 @@ def configure_logging():
     setup_logger(
         log_root=test_log_root,
         merge_name="test",
-        console=ConsoleSink(min_level="debug"),
+        console=ConsoleSink(level="debug"),
     )
 
 

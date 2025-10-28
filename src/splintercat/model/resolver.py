@@ -260,38 +260,130 @@ class WorkspaceResolver:
             )
 
     def _log_message_history(self, messages: list):
-        """Log complete LLM conversation."""
-        logger.info(f"LLM conversation: {len(messages)} messages")
+        """Log complete LLM conversation with full message part details.
+
+        Uses dataclass fields from pydantic-ai message parts to provide
+        comprehensive logging with correlation IDs, timestamps, and
+        metadata.
+        """
+        logger.info(
+            f"LLM conversation: {len(messages)} messages",
+            message_count=len(messages)
+        )
+
+        # Build correlation map: tool_call_id -> tool_name for tracking
+        tool_calls = {}
 
         for i, msg in enumerate(messages, 1):
             role = getattr(msg, 'role', 'unknown')
-            logger.info(f"Message {i} [{role}]")
+            logger.info(f"Message {i} [{role}]", message_index=i, role=role)
 
             if hasattr(msg, 'parts'):
-                for part in msg.parts:
+                for _part_idx, part in enumerate(msg.parts):
                     part_type = type(part).__name__
 
                     if 'UserPrompt' in part_type:
-                        logger.info(f"  User: {getattr(part, 'content', '')}")
+                        content = getattr(part, 'content', '')
+                        logger.info(
+                            f"  User: {content}",
+                            part_type="user_prompt",
+                            content_length=len(str(content)),
+                        )
 
                     elif 'Text' in part_type:
-                        logger.info(f"  Model: {getattr(part, 'content', '')}")
+                        content = getattr(part, 'content', '')
+                        logger.info(
+                            f"  Model: {content}",
+                            part_type="text",
+                            content_length=len(str(content)),
+                        )
 
                     elif 'ToolCall' in part_type:
-                        tool_name = getattr(part, 'tool_name', '?')
-                        args = getattr(part, 'args', {})
-                        logger.info(f"  ToolCall: {tool_name}({args})")
+                        # Use dataclass fields for structured logging
+                        tool_name = part.tool_name
+                        tool_call_id = part.tool_call_id
+
+                        # Get args as dict for better logging
+                        try:
+                            args = part.args_as_dict()
+                        except Exception:
+                            args = part.args
+
+                        # Store for correlation
+                        tool_calls[tool_call_id] = tool_name
+
+                        logger.info(
+                            f"  ToolCall: {tool_name}({args})",
+                            part_type="tool_call",
+                            tool_name=tool_name,
+                            tool_call_id=tool_call_id,
+                            args=args,
+                        )
 
                     elif 'ToolReturn' in part_type:
-                        content = getattr(part, 'content', '')
-                        logger.info(f"  ToolResult: {content}")
+                        # Use dataclass fields for structured logging
+                        tool_name = part.tool_name
+                        tool_call_id = part.tool_call_id
+                        content = part.content
+                        timestamp = part.timestamp
+                        metadata = part.metadata
+
+                        # Truncate large content for readability
+                        content_str = str(content)
+                        content_preview = content_str[:200]
+                        content_size = len(content_str)
+
+                        # Check if this return correlates with a
+                        # previous call
+                        correlation = tool_calls.get(tool_call_id, 'unknown')
+
+                        ellipsis = '...' if content_size > 200 else ''
+                        logger.info(
+                            f"  ToolReturn [{tool_name}]: "
+                            f"{content_preview}{ellipsis}",
+                            part_type="tool_return",
+                            tool_name=tool_name,
+                            tool_call_id=tool_call_id,
+                            correlation_tool=correlation,
+                            content_size=content_size,
+                            timestamp=str(timestamp),
+                            metadata=metadata,
+                        )
+
+                        # Log full content at trace level
+                        logger.trace(
+                            f"  ToolReturn [{tool_name}] full "
+                            f"content:\n{content}",
+                            tool_name=tool_name,
+                            tool_call_id=tool_call_id,
+                        )
 
                     elif 'RetryPrompt' in part_type:
-                        content = getattr(part, 'content', '')
-                        logger.warning(f"  RetryPrompt: {content}")
+                        # Use dataclass fields for structured logging
+                        content = part.content
+                        tool_name = part.tool_name
+                        tool_call_id = part.tool_call_id
+                        timestamp = part.timestamp
+
+                        # Check correlation
+                        correlation = tool_calls.get(tool_call_id, 'unknown')
+
+                        logger.warning(
+                            f"  RetryPrompt [{tool_name or 'general'}]: "
+                            f"{content}",
+                            part_type="retry_prompt",
+                            tool_name=tool_name,
+                            tool_call_id=tool_call_id,
+                            correlation_tool=correlation,
+                            timestamp=str(timestamp),
+                            retry_content=str(content),
+                        )
 
                     else:
-                        logger.debug(f"  {part_type}: {part}")
+                        logger.debug(
+                            f"  {part_type}: {part}",
+                            part_type=part_type.lower(),
+                        )
 
     def _log_result_debug_info(self, result):
         """Log extensive result details for debugging LLM responses.

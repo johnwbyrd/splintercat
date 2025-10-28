@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from opentelemetry.proto.logs.v1 import logs_pb2
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, model_validator
 
 from splintercat.core.base import BaseConfig
 
@@ -57,6 +57,13 @@ class Sink(BaseConfig):
     """
 
     enabled: bool = Field(default=True, description="Enable this sink")
+    level: str | None = Field(
+        default=None,
+        description=(
+            "Log level for this sink. If None, inherits from Logger.level. "
+            "Valid: trace, debug, info, warn, error, fatal"
+        )
+    )
     escape_special_characters: bool = Field(
         default=False,
         description="Escape newlines/tabs in output"
@@ -175,10 +182,6 @@ class Sink(BaseConfig):
 class ConsoleSink(Sink):
     """Console output sink (stdout/stderr)."""
 
-    min_level: str = Field(
-        default="info",
-        description="Minimum log level: trace, debug, info, warn, error"
-    )
     verbose: bool = Field(
         default=True,
         description="Show full span details"
@@ -238,10 +241,6 @@ class FileSink(Sink):
     path: str = Field(
         default="{log_root}/{merge_name}/splintercat.log",
         description="Log file path template"
-    )
-    min_level: str = Field(
-        default="debug",
-        description="Minimum log level for file output"
     )
 
     # Runtime state
@@ -319,6 +318,13 @@ class Logger(BaseConfig):
     ensures all resources are freed even on exceptions.
     """
 
+    level: str = Field(
+        default="info",
+        description=(
+            "Default log level for all sinks. Individual sinks can override. "
+            "Valid: trace, debug, info, warn, error, fatal"
+        )
+    )
     console: ConsoleSink = Field(
         default_factory=ConsoleSink,
         description="Console output configuration"
@@ -335,6 +341,15 @@ class Logger(BaseConfig):
         default_factory=LogfireSink,
         description="Logfire.dev cloud configuration"
     )
+
+    @model_validator(mode='after')
+    def _cascade_level_to_sinks(self) -> 'Logger':
+        """Cascade default level to sinks that don't specify their
+        own."""
+        for sink in [self.console, self.file]:
+            if sink.level is None:
+                sink.level = self.level
+        return self
 
     def setup(self, log_root: Path, merge_name: str):
         """Initialize all enabled sinks.
@@ -364,7 +379,7 @@ class Logger(BaseConfig):
 
         console_config = (
             ConsoleOptions(
-                min_log_level=self.console.min_level,
+                min_log_level=self.console.level,
                 verbose=self.console.verbose,
                 colors=self.console.colors,
                 include_timestamps=True,
