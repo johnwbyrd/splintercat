@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from opentelemetry.proto.logs.v1 import logs_pb2
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from pydantic import Field, PrivateAttr, model_validator
 
 from splintercat.core.base import BaseConfig
@@ -48,6 +50,69 @@ class _LoggerProxy:
 logger = _LoggerProxy()
 
 
+class LevelFilteringExporter(SpanExporter):
+    """Span exporter that filters spans by log level.
+
+    Wraps another exporter and only forwards spans that meet the
+    minimum level threshold.
+    """
+
+    # SINGLE SOURCE OF TRUTH: Map level names to OpenTelemetry
+    # severity numbers. Used throughout for level filtering and display.
+    _level_thresholds = {
+        'spew': logs_pb2.SEVERITY_NUMBER_TRACE,    # 1 - most verbose
+        'trace': logs_pb2.SEVERITY_NUMBER_TRACE3,  # 3
+        'debug': logs_pb2.SEVERITY_NUMBER_DEBUG,   # 5
+        'info': logs_pb2.SEVERITY_NUMBER_INFO,     # 9
+        'warn': logs_pb2.SEVERITY_NUMBER_WARN,     # 13
+        'error': logs_pb2.SEVERITY_NUMBER_ERROR,   # 17
+        'fatal': logs_pb2.SEVERITY_NUMBER_FATAL,   # 21
+    }
+
+    def __init__(self, exporter: SpanExporter, min_level: str):
+        """Initialize filtering exporter.
+
+        Args:
+            exporter: The underlying exporter to forward spans to
+            min_level: Minimum level (spew, trace, debug, info, etc.)
+        """
+        self._exporter = exporter
+        self._min_severity = self._level_thresholds.get(
+            min_level.lower(), logs_pb2.SEVERITY_NUMBER_INFO
+        )
+
+    def export(self, spans: list[ReadableSpan]) -> SpanExportResult:
+        """Export spans that meet the level threshold.
+
+        OpenTelemetry severity: lower numbers = more verbose/detailed
+        Higher numbers = less verbose/more important
+        Filter keeps spans with severity >= min_severity
+        """
+        filtered = []
+        for span in spans:
+            attrs = span.attributes or {}
+            level_num = attrs.get(
+                'logfire.level_num', logs_pb2.SEVERITY_NUMBER_INFO
+            )
+
+            # Include spans at or above minimum severity
+            if level_num >= self._min_severity:
+                filtered.append(span)
+
+        # Forward filtered spans to underlying exporter
+        if filtered:
+            return self._exporter.export(filtered)
+        return SpanExportResult.SUCCESS
+
+    def shutdown(self) -> None:
+        """Shutdown underlying exporter."""
+        self._exporter.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        """Force flush underlying exporter."""
+        return self._exporter.force_flush(timeout_millis)
+
+
 class Sink(BaseConfig):
     """Base class for log output sinks.
 
@@ -61,7 +126,7 @@ class Sink(BaseConfig):
         default=None,
         description=(
             "Log level for this sink. If None, inherits from Logger.level. "
-            "Valid: trace, debug, info, warn, error, fatal"
+            "Valid: spew, trace, debug, info, warn, error, fatal"
         )
     )
     escape_special_characters: bool = Field(
@@ -97,23 +162,24 @@ class Sink(BaseConfig):
         lineno = attrs.get("code.lineno", "")
 
         # Convert OpenTelemetry severity number to level name
+        # Use reverse lookup from central mapping
         level_num = attrs.get(
             "logfire.level_num", logs_pb2.SEVERITY_NUMBER_INFO
         )
 
-        if level_num >= logs_pb2.SEVERITY_NUMBER_ERROR:
-            level_name = "error"
-        elif level_num >= logs_pb2.SEVERITY_NUMBER_WARN:
-            level_name = "warn"
-        elif level_num >= logs_pb2.SEVERITY_NUMBER_INFO:
-            level_name = "info"
-        elif level_num >= logs_pb2.SEVERITY_NUMBER_DEBUG:
-            level_name = "debug"
-        else:
-            level_name = "trace"
+        # Find the level name by checking thresholds in descending order
+        level_name = "unknown"
+        for name in [
+            'fatal', 'error', 'warn', 'info', 'debug', 'trace', 'spew'
+        ]:
+            threshold = LevelFilteringExporter._level_thresholds.get(name)
+            if level_num >= threshold:
+                level_name = name
+                break
 
         # Calculate syslog priority (RFC 5424 severity levels)
         severity_map = {
+            "spew": 7,   # Debug
             "trace": 7,  # Debug
             "debug": 7,  # Debug
             "info": 6,   # Informational
@@ -252,12 +318,19 @@ class OTLPSink(Sink):
         )
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-        exporter = OTLPSpanExporter(
+        base_exporter = OTLPSpanExporter(
             endpoint=self.endpoint,
             insecure=self.insecure,
             headers=self.headers if self.headers else None,
         )
-        return BatchSpanProcessor(exporter)
+
+        # Wrap with level filtering if level is set
+        if self.level:
+            filtered_exporter = LevelFilteringExporter(
+                base_exporter, self.level
+            )
+            return BatchSpanProcessor(filtered_exporter)
+        return BatchSpanProcessor(base_exporter)
 
 
 class FileSink(Sink):
@@ -295,11 +368,14 @@ class FileSink(Sink):
 
         # Use generic formatter from base Sink class
         # Use ConsoleSpanExporter with custom formatter
-        exporter = ConsoleSpanExporter(
+        base_exporter = ConsoleSpanExporter(
             out=self._file,
             formatter=self._format_span
         )
-        return BatchSpanProcessor(exporter)
+
+        # Wrap with level filtering exporter
+        filtered_exporter = LevelFilteringExporter(base_exporter, self.level)
+        return BatchSpanProcessor(filtered_exporter)
 
     def close(self):
         """Close processor first, then close file.
@@ -351,7 +427,7 @@ class Logger(BaseConfig):
         default="info",
         description=(
             "Default log level for all sinks. Individual sinks can override. "
-            "Valid: trace, debug, info, warn, error, fatal"
+            "Valid: spew, trace, debug, info, warn, error, fatal"
         )
     )
     console: ConsoleSink = Field(
@@ -444,7 +520,24 @@ class Logger(BaseConfig):
     def trace(self, msg: str, **kwargs):
         """Log trace message."""
         import logfire
-        logfire.trace(msg, **kwargs)
+        logfire.log(
+            level=LevelFilteringExporter._level_thresholds['trace'],
+            msg_template=msg,
+            attributes=kwargs if kwargs else None
+        )
+
+    def spew(self, msg: str, **kwargs):
+        """Log very verbose spew message.
+
+        Spew is below trace - use for extremely noisy internal
+        mechanics like subprocess lifecycle events.
+        """
+        import logfire
+        logfire.log(
+            level=LevelFilteringExporter._level_thresholds['spew'],
+            msg_template=msg,
+            attributes=kwargs if kwargs else None
+        )
 
     def warn(self, msg: str, **kwargs):
         """Log warning message."""

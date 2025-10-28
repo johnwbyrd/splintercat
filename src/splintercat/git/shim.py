@@ -78,7 +78,7 @@ class PopenShim:
         # Note: Uses _REAL_POPEN saved at module import time
         self._process = _REAL_POPEN(args, **kwargs)
 
-        logger.trace(f"Started process PID {self._process.pid}")
+        logger.spew(f"Started process PID {self._process.pid}")
 
     def communicate(self, input=None, timeout=None):
         """Send input and wait for completion.
@@ -93,7 +93,7 @@ class PopenShim:
         stdout, stderr = self._process.communicate(input, timeout)
 
         # Log completion
-        logger.trace(
+        logger.spew(
             "Process communicate() completed",
             returncode=self._process.returncode,
             stdout_bytes=len(stdout) if stdout else 0,
@@ -112,7 +112,7 @@ class PopenShim:
 
         # Log first time we see completion
         if returncode is not None and not hasattr(self, '_poll_logged'):
-            logger.trace(f"Process exited with code {returncode}")
+            logger.spew(f"Process exited with code {returncode}")
             self._poll_logged = True
 
         return returncode
@@ -127,7 +127,7 @@ class PopenShim:
             Return code
         """
         returncode = self._process.wait(timeout)
-        logger.trace(f"Process wait() returned code {returncode}")
+        logger.spew(f"Process wait() returned code {returncode}")
         return returncode
 
     def __enter__(self):

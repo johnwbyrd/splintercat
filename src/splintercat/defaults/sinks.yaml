@@ -51,7 +51,7 @@ config:
 #
 # Available template variables:
 #   {timestamp} - datetime object
-#   {level} - log level (TRACE, DEBUG, INFO, WARN, ERROR)
+#   {level} - log level (spew, trace, debug, info, warn, error, fatal)
 #   {message} - log message
 #   {filepath} - source file path
 #   {lineno} - source line number

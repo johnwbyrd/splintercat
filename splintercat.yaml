@@ -63,7 +63,7 @@ config:
   # LOGGER - Logging output configuration
   # ==============================================================================
   logger:
-    # Default log level for all sinks (trace, debug, info, warn, error, fatal)
+    # Default log level for all sinks (spew, trace, debug, info, warn, error, fatal)
     # Individual sinks can override by setting their own level
     level: trace
 
