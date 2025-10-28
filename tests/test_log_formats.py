@@ -72,12 +72,12 @@ def test_text_format(temp_log_dir):
     content = log_file.read_text()
     line = content.strip()
 
-    # Expected: 2025-10-26 11:12:03.621747 [INFO]
+    # Expected: 2025-10-26 11:12:03.621747 [info]
     # src/splintercat/core/log.py:393 Test message
     # Validate structure with regex
     pattern = (
         r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ '
-        r'\[(TRACE|DEBUG|INFO|WARNING|ERROR|CRITICAL)\] '
+        r'\[(trace|debug|info|notice|warn|warning|error|fatal)\] '
         r'.+\.py:\d+ Test message$'
     )
     assert re.match(pattern, line), (

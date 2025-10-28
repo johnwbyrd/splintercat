@@ -1,5 +1,6 @@
 """Conflict resolver using pydantic-AI agent with workspace tools."""
 
+import traceback
 from contextlib import contextmanager
 
 from pydantic_ai import Agent, providers
@@ -196,7 +197,14 @@ class WorkspaceResolver:
         Args:
             e: Exception that occurred during resolution
         """
-        logger.error(f"LLM API call failed: {e}")
+        # Log with proper exception info so logfire captures it at ERROR level
+        logger.error("LLM API call failed", _exc_info=e)
+
+        # Log formatted traceback for easy reading
+        tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
+        logger.error("Exception traceback:\n" + ''.join(tb_lines))
+
+        # Log exception attributes for structured data
         logger.error(f"Exception type: {type(e)}")
         logger.error(f"Exception __cause__: {e.__cause__}")
 
@@ -229,6 +237,58 @@ class WorkspaceResolver:
 
         # Check all exception attributes
         logger.error(f"Exception __dict__: {e.__dict__}")
+
+        # Walk the exception cause chain to find underlying errors
+        cause = e.__cause__
+        depth = 1
+        while cause:
+            logger.error(
+                f"Exception cause chain (depth {depth}): {cause}",
+                _exc_info=cause
+            )
+            logger.error(f"Cause type: {type(cause)}")
+            logger.error(f"Cause __dict__: {cause.__dict__}")
+            cause = cause.__cause__
+            depth += 1
+
+        # Check exception context (different from cause)
+        if e.__context__ is not None and e.__context__ is not e.__cause__:
+            logger.error(
+                f"Exception context: {e.__context__}",
+                _exc_info=e.__context__
+            )
+
+    def _log_message_history(self, messages: list):
+        """Log complete LLM conversation."""
+        logger.info(f"LLM conversation: {len(messages)} messages")
+
+        for i, msg in enumerate(messages, 1):
+            role = getattr(msg, 'role', 'unknown')
+            logger.info(f"Message {i} [{role}]")
+
+            if hasattr(msg, 'parts'):
+                for part in msg.parts:
+                    part_type = type(part).__name__
+
+                    if 'UserPrompt' in part_type:
+                        logger.info(f"  User: {getattr(part, 'content', '')}")
+
+                    elif 'Text' in part_type:
+                        logger.info(f"  Model: {getattr(part, 'content', '')}")
+
+                    elif 'ToolCall' in part_type:
+                        tool_name = getattr(part, 'tool_name', '?')
+                        args = getattr(part, 'args', {})
+                        logger.info(f"  ToolCall: {tool_name}({args})")
+
+                    elif 'ToolReturn' in part_type:
+                        logger.info(f"  ToolResult: {getattr(part, 'content', '')}")
+
+                    elif 'RetryPrompt' in part_type:
+                        logger.warning(f"  RetryPrompt: {getattr(part, 'content', '')}")
+
+                    else:
+                        logger.debug(f"  {part_type}: {part}")
 
     def _log_result_debug_info(self, result):
         """Log extensive result details for debugging LLM responses.
@@ -298,6 +358,9 @@ class WorkspaceResolver:
         # Build prompt
         prompt = self._build_prompt(workspace, failure_context)
 
+        # Log prompt being sent
+        logger.info(f"Sending prompt to LLM: {prompt}")
+
         # Log pre-call debug info
         self._log_pre_call_debug_info(workspace, prompt)
 
@@ -305,21 +368,36 @@ class WorkspaceResolver:
         agent = self._create_agent()
         self._log_agent_debug_info(agent)
 
-        # Run agent with workspace as dependencies
+        # Run agent with workspace as dependencies using streaming
         logger.debug("Calling LLM API...")
         try:
-            result = await agent.run(prompt, deps=workspace)
-            logger.debug("LLM API call completed")
+            async with agent.run_stream(prompt, deps=workspace) as stream:
+                # Get the final output
+                result = await stream.get_output()
+                logger.debug("LLM API call completed")
+
+                # Log conversation history
+                messages = stream.all_messages()
+                self._log_message_history(messages)
+
+                # Log result debug info
+                self._log_result_debug_info(stream)
+
+                # The agent should call submit_resolution which validates
+                # and returns the content
+                return result
+
         except Exception as e:
+            # Stream is still in scope - we can access messages even on failure
+            try:
+                messages = stream.all_messages()
+                logger.error(f"Logging message history from failed run ({len(messages)} messages)")
+                self._log_message_history(messages)
+            except Exception as e2:
+                logger.error(f"Could not retrieve messages from failed run: {e2}")
+
             self._log_exception_debug_info(e)
             raise
-
-        # Log result debug info
-        self._log_result_debug_info(result)
-
-        # The agent should call submit_resolution which validates
-        # and returns the content
-        return result.output
 
 
 async def resolve_workspace(

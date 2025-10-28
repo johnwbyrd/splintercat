@@ -7,6 +7,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any
 
+from opentelemetry.proto.logs.v1 import logs_pb2
 from pydantic import Field, PrivateAttr
 
 from splintercat.core.base import BaseConfig
@@ -88,31 +89,30 @@ class Sink(BaseConfig):
         filepath = attrs.get("code.filepath", "")
         lineno = attrs.get("code.lineno", "")
 
-        # Get numeric level and convert to name
-        level_num = attrs.get("logfire.level_num", 20)
+        # Convert OpenTelemetry severity number to level name
+        level_num = attrs.get(
+            "logfire.level_num", logs_pb2.SEVERITY_NUMBER_INFO
+        )
 
-        # Map numeric levels to names (Python logging standard)
-        if level_num >= 50:
-            level_name = "CRITICAL"
-        elif level_num >= 40:
-            level_name = "ERROR"
-        elif level_num >= 30:
-            level_name = "WARNING"
-        elif level_num >= 20:
-            level_name = "INFO"
-        elif level_num >= 10:
-            level_name = "DEBUG"
+        if level_num >= logs_pb2.SEVERITY_NUMBER_ERROR:
+            level_name = "error"
+        elif level_num >= logs_pb2.SEVERITY_NUMBER_WARN:
+            level_name = "warn"
+        elif level_num >= logs_pb2.SEVERITY_NUMBER_INFO:
+            level_name = "info"
+        elif level_num >= logs_pb2.SEVERITY_NUMBER_DEBUG:
+            level_name = "debug"
         else:
-            level_name = "TRACE"
+            level_name = "trace"
 
-        # Calculate syslog priority
+        # Calculate syslog priority (RFC 5424 severity levels)
         severity_map = {
-            "TRACE": 7,
-            "DEBUG": 7,
-            "INFO": 6,
-            "WARNING": 4,
-            "ERROR": 3,
-            "CRITICAL": 0,
+            "trace": 7,  # Debug
+            "debug": 7,  # Debug
+            "info": 6,   # Informational
+            "warn": 4,   # Warning
+            "error": 3,  # Error
+            "fatal": 3,  # Error
         }
         severity = severity_map.get(level_name, 6)
         priority = 8 * 1 + severity  # facility=user(1)
