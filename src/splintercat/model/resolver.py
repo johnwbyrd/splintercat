@@ -197,7 +197,8 @@ class WorkspaceResolver:
         Args:
             e: Exception that occurred during resolution
         """
-        # Log with proper exception info so logfire captures it at ERROR level
+        # Log with proper exception info so logfire captures it at
+        # ERROR level
         logger.error("LLM API call failed", _exc_info=e)
 
         # Log formatted traceback for easy reading
@@ -282,10 +283,12 @@ class WorkspaceResolver:
                         logger.info(f"  ToolCall: {tool_name}({args})")
 
                     elif 'ToolReturn' in part_type:
-                        logger.info(f"  ToolResult: {getattr(part, 'content', '')}")
+                        content = getattr(part, 'content', '')
+                        logger.info(f"  ToolResult: {content}")
 
                     elif 'RetryPrompt' in part_type:
-                        logger.warning(f"  RetryPrompt: {getattr(part, 'content', '')}")
+                        content = getattr(part, 'content', '')
+                        logger.warning(f"  RetryPrompt: {content}")
 
                     else:
                         logger.debug(f"  {part_type}: {part}")
@@ -383,18 +386,25 @@ class WorkspaceResolver:
                 # Log result debug info
                 self._log_result_debug_info(stream)
 
-                # The agent should call submit_resolution which validates
-                # and returns the content
+                # The agent should call submit_resolution which
+                # validates and returns the content
                 return result
 
         except Exception as e:
-            # Stream is still in scope - we can access messages even on failure
+            # Stream is still in scope - we can access messages even
+            # on failure
             try:
                 messages = stream.all_messages()
-                logger.error(f"Logging message history from failed run ({len(messages)} messages)")
+                msg_count = len(messages)
+                logger.error(
+                    f"Logging message history from failed run "
+                    f"({msg_count} messages)"
+                )
                 self._log_message_history(messages)
             except Exception as e2:
-                logger.error(f"Could not retrieve messages from failed run: {e2}")
+                logger.error(
+                    f"Could not retrieve messages from failed run: {e2}"
+                )
 
             self._log_exception_debug_info(e)
             raise
