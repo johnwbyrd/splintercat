@@ -151,10 +151,39 @@ class Sink(BaseConfig):
 
         # Apply template
         try:
-            return self.format_template.format(**data) + '\n'
+            formatted = self.format_template.format(**data)
         except KeyError as e:
             # Template references unknown field
             return f"ERROR: Invalid template field {e}\n"
+
+        # Append custom attributes (user-provided kwargs to
+        # logger calls). Skip only OpenTelemetry/instrumentation
+        # internals
+        attrs = span.attributes or {}
+        custom_attrs = {}
+        skip_prefixes = ('otel.', 'telemetry.', 'service.', 'process.')
+        skip_keys = {
+            'code.filepath', 'code.lineno', 'code.function',
+            'logfire.msg', 'logfire.level_num', 'logfire.span_type',
+            'logfire.msg_template', 'logfire.json_schema',
+        }
+
+        for key, value in attrs.items():
+            # Skip internal attributes and those already in template
+            if key in skip_keys:
+                continue
+            if any(key.startswith(prefix) for prefix in skip_prefixes):
+                continue
+            custom_attrs[key] = value
+
+        # If there are custom attributes, append them
+        if custom_attrs:
+            attrs_str = ' '.join(
+                f"{k}={repr(v)}" for k, v in sorted(custom_attrs.items())
+            )
+            formatted = f"{formatted} │ {attrs_str}"
+
+        return formatted + '\n'
 
     @abstractmethod
     def create_processor(self, log_root: Path, merge_name: str):
