@@ -25,7 +25,7 @@ The following constitute instructions for Claude, OpenAI, Cline, and other LLM-b
 
 When instructed to read all files in this project or codebase:
 
-- **Read EVERY .md, .py, and .toml file** - Do not selectively prioritize "core" or "architectural" files. Read all files mentioned, including utilities, imports, empty files, test files, and configuration files.  Use the read_multiple_files tool to make this process efficient.
+- **Read EVERY .md, .yaml, .py, and .toml file** - Do not selectively prioritize "core" or "architectural" files. Read all files mentioned, including utilities, imports, empty files, test files, and configuration files.  Start with the .md files to get a good overview, then proceed to the yaml, and then to the Python.  Use the read_multiple_files tool to make this process efficient.
 - **Complete before proceeding** - Do not proceed to analysis, planning, or testing until ALL files have been read.
 - **No assumptions about importance** - Even seemingly minor files can contain critical details or dependencies. Assumption of irrelevance is not permitted.
 - **Account for volume** - If the set is very large (dozens of files), explain the scope challenge explicitly and request prioritization guidance rather than arbitrarily reducing coverage.

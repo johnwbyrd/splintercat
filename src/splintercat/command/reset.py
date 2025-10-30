@@ -6,18 +6,20 @@ from splintercat.core.log import logger
 
 
 class ResetCommand(BaseModel):
-    """Clean up git-imerge state and abort current merge.
+    """Clean up git-imerge state and reset repository to known good state.
 
-    Removes all git-imerge refs and state, effectively aborting any
-    in-progress merge operation. This is useful for starting fresh or
-    cleaning up after a failed merge.
+    Removes all git-imerge refs and state, aborts any in-progress merge,
+    cleans working directory, and recreates target branch from source.
+    This provides a complete reset to a known good state, equivalent to
+    the reset-branches.bash script.
     """
 
     destroy_target_branch: bool = Field(
-        default=False,
+        default=True,
         alias="destroy-target-branch",
         description=(
-            "Destroy and recreate target branch from source ref. "
+            "Destroy and recreate target branch from source ref (default behavior). "
+            "Use --destroy-target-branch=false for safe reset that preserves branch. "
             "Steps: (1) abort any in-progress merge, (2) hard reset "
             "working tree, (3) clean untracked files, (4) delete "
             "target branch, (5) checkout -B target from source"

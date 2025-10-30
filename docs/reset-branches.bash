@@ -23,6 +23,15 @@ git merge --abort 2>/dev/null || true
 git reset --hard 2>/dev/null || true
 git clean -fd 2>/dev/null || true
 
+# Tell git-imerge to drop any in-progress merges
+echo "Removing any in-progress git-imerge merges..."
+if git-imerge list | grep -q "llvm-upstream-merge"; then
+    echo "Removing llvm-upstream-merge (exists)..."
+    git-imerge remove llvm-upstream-merge
+else
+    echo "  (llvm-upstream-merge not found - skipping removal)"
+fi
+
 # Delete stable-test branch if it exists
 echo "Deleting stable-test branch if it exists..."
 git branch -D stable-test 2>/dev/null || echo "  (branch didn't exist)"

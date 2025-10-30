@@ -28,21 +28,9 @@ The LLM picks a resolution (ours, theirs, or a custom merge) and explains its re
 
 ### Step 3: Validate Incrementally
 
-You don't want to resolve 50 conflicts and then discover the build is broken. You configure a strategy to decide when to build and test:
+BROKEN CODE DOES NOT GET COMMITTED.  If ANY check fails (build, test, etc.), the system must return to the ResolveConflicts node, without committing the changes and plunging forward in the imerge process. No code that fails validation gets committed or merged. Failed checks = return to previous step, no exceptions.
 
-- **optimistic**: Resolve everything, then test once (fast but risky)
-- **batch**: Resolve 10 conflicts, test, repeat (balanced)
-- **per-conflict**: Resolve one conflict, test immediately (slow but safe)
-
-The strategy is configured by the user in config.yaml, not chosen by an LLM.
-
-### Step 4: Recover from Failures
-
-When the build breaks, retry the current batch with the error log as additional context. The resolver sees what went wrong and can make better decisions on the second try.
-
-After max_retries (default 3) attempts, abort and ask for human help.
-
-### Step 5: Finish
+### Step 4: Finish
 
 Once all conflicts are resolved and tests pass, git-imerge simplifies the hundreds of tiny merges into a single clean two-parent merge commit. It looks like a normal merge, preserves all the original commit hashes, and everything works.
 

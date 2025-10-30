@@ -37,10 +37,10 @@ config:
     # User-defined checks - add as many as you want with any names
     commands:
       # Quick syntax check (fast)
-      quick: "cd {config.git.target_workdir}/build && ninja -n"
+      quick: "cd {config.git.target_workdir}/build && ninja"
 
       # Full build and test (thorough)
-      normal: "cd {config.git.target_workdir}/build && ninja check-llvm"
+      normal: "cd {config.git.target_workdir}/build && ninja check-llvm-mc-mos"
 
   # ==============================================================================
   # LLM - Language model configuration
